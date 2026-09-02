@@ -44,10 +44,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- This is the SHIPPED analyzer, so it is built against a deliberately low Roslyn floor:
-         an analyzer cannot load in a host older than the version it was compiled against, and
-         this is the oldest consumer tooling supported, not the newest available. Anything
-         newer that Roslyn offers belongs in a shim, not in a version bump here. -->
+    <!-- This is the SHIPPED analyzer, so this version is the Roslyn HOST FLOOR: an analyzer
+         cannot load in a compiler or IDE older than the Microsoft.CodeAnalysis it was compiled
+         against. The port pinned 4.3.0; Jeremy raised it to 5.9.0 - the compiler that ships in
+         .NET SDK 10.0.400 - before the first publish (1.0.245.159), and the package is verified
+         to load cleanly on that SDK. Every host the net10-only family targets is at least that
+         new. Move this only deliberately: raising it drops older consumer tooling. -->
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" PrivateAssets="all" />
     <!-- Build-time only. Pinned separately because it is never shipped: its version has nothing
          to do with the host floor above. It also overrides the older version the reference

@@ -140,12 +140,16 @@ consumer sees is byte-for-byte upstream's behaviour.
 Both analyzer projects target netstandard2.0. That is the family-sanctioned
 exception to net10-only: a Roslyn analyzer is loaded by the compiler or the IDE,
 not by the consuming application, and those hosts load netstandard2.0
-assemblies. They also pin a deliberately LOW Roslyn floor (4.3.0) rather than
-the newest available, because an analyzer cannot load in a host older than the
-version it was compiled against. Raising that floor drops consumer tooling; do
-it deliberately or not at all. netstandard2.0 defaults to C# 7.3, so both
-projects set LangVersion explicitly - that governs only what the SDK compiler
-accepts, not which host can load the result.
+assemblies. The Microsoft.CodeAnalysis version they pin is the Roslyn HOST
+FLOOR, because an analyzer cannot load in a compiler or IDE older than the
+version it was compiled against. The port pinned 4.3.0; Jeremy raised both
+projects to 5.9.0 - the compiler shipped in .NET SDK 10.0.400 - before the first
+publish (1.0.245.159), and the package is verified to load cleanly on that SDK,
+which is at least as new as every host the net10-only family targets. Raising
+that floor again drops older consumer tooling; do it deliberately or not at
+all. netstandard2.0 defaults to C# 7.3, so both projects set LangVersion
+explicitly - that governs only what the SDK compiler accepts, not which host
+can load the result.
 
 
 BUILDING

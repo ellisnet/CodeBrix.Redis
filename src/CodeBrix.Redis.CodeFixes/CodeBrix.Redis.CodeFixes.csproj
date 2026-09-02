@@ -29,8 +29,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The same low floor as the analyzer: a fix that will not load in the consumer's IDE is
-         no use, and there is nothing here that wants a modern Roslyn API. -->
+    <!-- The same Roslyn host floor as the analyzer (see CodeBrix.Redis.Build.csproj): a fix that
+         will not load in the consumer's IDE is no use, so this version moves only in step with
+         that one. -->
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.9.0" PrivateAssets="all" />
   </ItemGroup>
 
