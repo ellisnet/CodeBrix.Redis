@@ -31,7 +31,7 @@
   <ItemGroup>
     <!-- The same low floor as the analyzer: a fix that will not load in the consumer's IDE is
          no use, and there is nothing here that wants a modern Roslyn API. -->
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.3.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.9.0" PrivateAssets="all" />
   </ItemGroup>
 
 </Project>

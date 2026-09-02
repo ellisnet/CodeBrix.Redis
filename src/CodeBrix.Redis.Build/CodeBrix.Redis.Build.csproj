@@ -48,12 +48,12 @@
          an analyzer cannot load in a host older than the version it was compiled against, and
          this is the oldest consumer tooling supported, not the newest available. Anything
          newer that Roslyn offers belongs in a shim, not in a version bump here. -->
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.3.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" PrivateAssets="all" />
     <!-- Build-time only. Pinned separately because it is never shipped: its version has nothing
          to do with the host floor above. It also overrides the older version the reference
          above brings in transitively, which cannot see descriptors declared outside the
          analyzer type. -->
-    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
