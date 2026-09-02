@@ -1,0 +1,24 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+    <File Path="AGENT-README.txt" />
+    <File Path="EXTRAS-README.txt" />
+    <File Path="global.json" />
+    <File Path="icon-codebrix-128.png" />
+    <File Path="LICENSE" />
+    <File Path="MAINTAINER-README.txt" />
+    <File Path="README-INDEX.txt" />
+    <File Path="README.md" />
+    <File Path="THIRD-PARTY-NOTICES.txt" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="tests/CodeBrix.Redis.Tests/CodeBrix.Redis.Tests.csproj" />
+    <Project Path="tests/CodeBrix.Redis.Respite.Tests/CodeBrix.Redis.Respite.Tests.csproj" />
+    <Project Path="tests/CodeBrix.Redis.Build.Tests/CodeBrix.Redis.Build.Tests.csproj" />
+    <Project Path="tests/CodeBrix.Redis.TestServer/CodeBrix.Redis.TestServer.csproj" />
+    <Project Path="tests/CodeBrix.Redis.TestHarness/CodeBrix.Redis.TestHarness.csproj" />
+  </Folder>
+  <Project Path="src/CodeBrix.Redis/CodeBrix.Redis.csproj" />
+  <Project Path="src/CodeBrix.Redis.Build/CodeBrix.Redis.Build.csproj" />
+  <Project Path="src/CodeBrix.Redis.CodeFixes/CodeBrix.Redis.CodeFixes.csproj" />
+</Solution>

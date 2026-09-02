@@ -1,0 +1,158 @@
+using System;
+using System.IO;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using SilverAssertions;
+using Xunit;
+
+namespace CodeBrix.Redis.Tests; //was previously: StackExchange.Redis.Tests;
+
+[Collection(NonParallelCollection.Name)]
+public class LoggerTests(ITestOutputHelper output) : TestBase(output)
+{
+    [Fact]
+    public async Task basic_logger_config()
+    {
+        //gated: this test connects with ConnectionMultiplexer.Connect/ConnectAsync directly rather
+        //than through TestBase.Create, so it does not inherit that method's container-tier gate.
+        Skip.IfNoContainers();
+
+        var traceLogger = new TestLogger(LogLevel.Trace, TextWriter.Null);
+        var debugLogger = new TestLogger(LogLevel.Debug, TextWriter.Null);
+        var infoLogger = new TestLogger(LogLevel.Information, TextWriter.Null);
+        var warningLogger = new TestLogger(LogLevel.Warning, TextWriter.Null);
+        var errorLogger = new TestLogger(LogLevel.Error, TextWriter.Null);
+        var criticalLogger = new TestLogger(LogLevel.Critical, TextWriter.Null);
+
+        var options = ConfigurationOptions.Parse(GetConfiguration());
+        options.LoggerFactory = new TestWrapperLoggerFactory(new TestMultiLogger(traceLogger, debugLogger, infoLogger, warningLogger, errorLogger, criticalLogger));
+
+        await using var conn = await ConnectionMultiplexer.ConnectAsync(options);
+        Log($"Trace: {traceLogger.CallCount}, Debug: {debugLogger.CallCount}, Info: {infoLogger.CallCount}, Warning: {warningLogger.CallCount}, Error: {errorLogger.CallCount}");
+        // We expect more (or at least: no less) at the trace level: GET, ECHO, PING on commands
+        (traceLogger.CallCount >= debugLogger.CallCount).Should().BeTrue();
+        // Many calls for all log lines - don't set exact here since every addition would break the test
+        (debugLogger.CallCount > 30).Should().BeTrue();
+        (infoLogger.CallCount > 30).Should().BeTrue();
+        // No debug calls at this time
+        // We expect no error/critical level calls to have happened here
+        errorLogger.CallCount.Should().Be(0);
+        criticalLogger.CallCount.Should().Be(0);
+    }
+
+    private sealed class EnabledNullLogger : ILogger, IDisposable
+    {
+        private EnabledNullLogger() { }
+        public static readonly ILogger Instance = new EnabledNullLogger();
+
+        public bool IsEnabled(LogLevel level) => true; // NullLogger now says "no", which breaks our counting
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => this;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            // but do nothing with it
+        }
+        void IDisposable.Dispose() { }
+    }
+
+    [Fact]
+    public async Task wrapped_logger()
+    {
+        //gated: this test connects with ConnectionMultiplexer.Connect/ConnectAsync directly rather
+        //than through TestBase.Create, so it does not inherit that method's container-tier gate.
+        Skip.IfNoContainers();
+
+        var options = ConfigurationOptions.Parse(GetConfiguration());
+        var wrapped = new TestWrapperLoggerFactory(EnabledNullLogger.Instance);
+        options.LoggerFactory = wrapped;
+
+        await using var conn = await ConnectionMultiplexer.ConnectAsync(options);
+        (wrapped.Logger.LogCount > 0).Should().BeTrue();
+    }
+
+    public class TestWrapperLoggerFactory(ILogger logger) : ILoggerFactory
+    {
+        public TestWrapperLogger Logger { get; } = new TestWrapperLogger(logger);
+
+        public void AddProvider(ILoggerProvider provider) { }
+        public ILogger CreateLogger(string categoryName) => Logger;
+        public void Dispose() { }
+    }
+
+    public class TestWrapperLogger(ILogger toWrap) : ILogger
+    {
+        public int LogCount = 0;
+        private ILogger Inner { get; } = toWrap;
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => Inner.BeginScope(state);
+        public bool IsEnabled(LogLevel logLevel) => Inner.IsEnabled(logLevel);
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            Interlocked.Increment(ref LogCount);
+            Inner.Log(logLevel, eventId, state, exception, formatter);
+        }
+    }
+
+    /// <summary>
+    /// To save on test time, no reason to spin up n connections just to test n logging implementations...
+    /// </summary>
+    private sealed class TestMultiLogger(params ILogger[] loggers) : ILogger
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            foreach (var logger in loggers)
+            {
+                logger.Log(logLevel, eventId, state, exception, formatter);
+            }
+        }
+    }
+
+    private sealed class TestLogger : ILogger
+    {
+        private readonly StringBuilder sb = new StringBuilder();
+        private long _callCount;
+        private readonly LogLevel _logLevel;
+        private readonly TextWriter _output;
+        public TestLogger(LogLevel logLevel, TextWriter output) =>
+            (_logLevel, _output) = (logLevel, output);
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => logLevel >= _logLevel;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (!IsEnabled(logLevel))
+            {
+                return;
+            }
+
+            Interlocked.Increment(ref _callCount);
+            var logLine = $"{_logLevel}> [LogLevel: {logLevel}, EventId: {eventId}]: {formatter?.Invoke(state, exception)}";
+            lock (sb)
+            {
+                sb.AppendLine(logLine);
+            }
+
+            _output.WriteLine(logLine);
+        }
+
+        public long CallCount => Volatile.Read(ref _callCount);
+        public override string ToString()
+        {
+            lock (sb)
+            {
+                return sb.ToString();
+            }
+        }
+    }
+}

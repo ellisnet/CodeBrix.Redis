@@ -1,0 +1,97 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The main suite: the client, the command surface, cluster/sentinel/replica behaviour, and the
+    Redlock implementation. Ported from the upstream tests/StackExchange.Redis.Tests project and
+    from RedLockNet.Tests.
+
+    Server-backed tests get their endpoints from CodeBrix.Redis.TestHarness (containers via
+    CodeBrix.Docker); protocol-level tests that need only a responder use
+    CodeBrix.Redis.TestServer.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>CodeBrix.Redis.Tests</AssemblyName>
+    <RootNamespace>CodeBrix.Redis.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <!-- Matches the ported upstream test source; see src/CodeBrix.Redis/CodeBrix.Redis.csproj. -->
+    <Nullable>enable</Nullable>
+    <!-- Required by the ported suite's stackalloc/fixed sites - FormatTests.cs and
+         KeyNotificationUnitTests.cs measure formatting into stack buffers. Upstream sets the same
+         property for its whole test side in tests/Directory.Build.props; this repository has no
+         Directory.Build.props, so each csproj that needs it states it for itself. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- DELIBERATE, NARROW EXCEPTION to the family "no NoWarn anywhere" rule, approved by
+         Jeremy 2026-09-01 (plan decision 4). These six SERxxxx identifiers are NOT analyzer
+         defect rules: they are the diagnostic IDs of the [Experimental] API gates that the
+         library under test declares (Respite/Shared/Experiments.cs). C# raises an [Experimental]
+         diagnostic as an ERROR, and the language's only sanctioned opt-ins are NoWarn or marking
+         each consuming test class [Experimental] too. This line is that opt-in acknowledgement -
+         exactly what upstream's own Directory.Build.props carries - and it suppresses no defect.
+         StringToRedisValue is on this line for the same reason and on TEST-SIDE PROJECTS ONLY
+         (plan decision 6, approved 2026-09-01): the implicit string -> RedisValue conversion is
+         marked [Experimental("StringToRedisValue")] in DEBUG builds only, test code uses that
+         conversion throughout, and upstream opts its whole test side in the same way through
+         tests/Directory.Build.targets. The library and the analyzer projects never get it.
+         NOTHING ELSE MAY EVER BE ADDED TO THIS LINE. -->
+    <NoWarn>$(NoWarn);SER001;SER004;SER005;SER007;SER008;SER009;StringToRedisValue</NoWarn>
+  </PropertyGroup>
+
+  <!--
+    The suite's fixture files, carried over from upstream's own test project:
+
+      * RedisTestConfig.json is read BOTH as an embedded resource (Helpers/TestConfig.cs looks it
+        up as "CodeBrix.Redis.Tests.RedisTestConfig.json") and as a file beside the assembly, so a
+        developer can point the suite at a hand-run server without rebuilding. Upstream wires it
+        the same two ways.
+      * xunit.runner.json configures the runner.
+      * The Certificates/*.pem files back the pure certificate-validation tests in
+        Certificates/CertValidationTests.cs - no server involved. They are the randomly generated
+        test certificates upstream ships (see Certificates/README.md) and they are valid until
+        2048; the harness's own TLS material is generated at run time and is unrelated to these.
+      * redislabs_ca.pem backs the RedisLabs tests, which skip unless a developer sets
+        Config.RedisLabsSslServer. NOTE: that certificate EXPIRED on 2023-09-29 upstream; it is
+        carried across unmodified because those tests never run without hand configuration.
+
+    Upstream's App.config is NOT carried across: its only content is a .NET Framework
+    assembly-binding redirect for System.Buffers, which means nothing on net10.0.
+  -->
+  <ItemGroup>
+    <None Update="*.json" CopyToOutputDirectory="Always" />
+    <EmbeddedResource Include="*Config.json" />
+    <None Update="redislabs_ca.pem" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Certificates\*.pem" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="xunit.v3" Version="4.0.0" />
+    <PackageReference Include="SilverAssertions.ApacheLicenseForever" Version="1.0.237.1200" />
+    <!-- Replaces the upstream suite's NSubstitute usage (6 files); see MAINTAINER-README.txt. -->
+    <PackageReference Include="CodeBrix.TestMocks.ApacheLicenseForever" Version="1.0.237.1192" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CodeBrix.Redis\CodeBrix.Redis.csproj" />
+    <ProjectReference Include="..\CodeBrix.Redis.TestServer\CodeBrix.Redis.TestServer.csproj" />
+    <ProjectReference Include="..\CodeBrix.Redis.TestHarness\CodeBrix.Redis.TestHarness.csproj" />
+    <!-- RoundTripUnitTests/TestConnection.cs drives the round-trip tests through the protocol
+         suite's TestDuplexStream, exactly as upstream's test project references RESPite.Tests
+         for the same type. One shared helper, not a copy that can drift. -->
+    <ProjectReference Include="..\CodeBrix.Redis.Respite.Tests\CodeBrix.Redis.Respite.Tests.csproj" />
+    <!-- The ASCII-hash source generator is LOAD-BEARING here, not a convenience:
+         AsciiHashUnitTests.cs declares 25 `[AsciiHash] private static partial class` types with no
+         implementing part and asserts on the Length/Text/HashCS members the generator writes.
+         Without this reference the project fails with CS0117. Upstream gives every project the
+         same analyzer reference from its repo-wide Directory.Build.props; this repository has
+         none, so each csproj that needs it states it for itself. -->
+    <ProjectReference Include="..\..\src\CodeBrix.Redis.Build\CodeBrix.Redis.Build.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>

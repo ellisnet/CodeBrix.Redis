@@ -1,0 +1,80 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Roslyn source generators and analyzers for CodeBrix.Redis.
+
+    This project is NOT optional and is NOT merely a developer convenience: two of its
+    generators emit source that src/CodeBrix.Redis cannot compile without. It is also shipped
+    inside the CodeBrix.Redis.MitLicenseForever package (see the packaging target in
+    CodeBrix.Redis.csproj) so that consumers get the same diagnostics the upstream
+    StackExchange.Redis package provides.
+
+    netstandard2.0 is mandatory here and is the family-sanctioned exception to net10-only: a
+    Roslyn analyzer is loaded by the compiler/IDE host, not by the consuming application, and
+    those hosts load netstandard2.0 assemblies.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- netstandard2.0 defaults to C# 7.3; the generator/analyzer source needs a modern
+         language version. This affects only what the SDK compiler accepts here, not which
+         Roslyn host can load the result (that is the package floor above). -->
+    <LangVersion>latest</LangVersion>
+    <!-- Upstream builds this project with ImplicitUsings enabled. The CodeBrix family does
+         not use implicit or global usings anywhere, so it is deliberately NOT set here:
+         ported files carry their own explicit using block. -->
+    <Nullable>enable</Nullable>
+    <!-- Required by Respite/Shared/AsciiHash.cs, which is compiled into this project as well as
+         into the library (see the <Compile Include> items below) and uses fixed/pointer code in
+         its case-insensitive comparisons. Upstream set the same property repository-wide in its
+         Directory.Build.props; this repository has none, so every project states it. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IsPackable>false</IsPackable>
+    <!-- DELIBERATE, NARROW EXCEPTION to the family "no NoWarn anywhere" rule, approved by
+         Jeremy 2026-09-01 (plan decision 4). These six SERxxxx identifiers are NOT analyzer
+         defect rules: they are the diagnostic IDs of the [Experimental] API gates declared in
+         Respite/Shared/Experiments.cs, which this project compiles (AsciiHash.cs) and names.
+         C# raises an [Experimental] diagnostic as an ERROR, and the language's only sanctioned
+         opt-ins are NoWarn or marking the consumer [Experimental] too. This line is that opt-in
+         acknowledgement - exactly what upstream's own Directory.Build.props carries - and it
+         suppresses no defect: every upstream [Experimental] attribute is still present, so a
+         CONSUMER of this package still sees the identical gate. NOTHING ELSE MAY EVER BE ADDED
+         TO THIS LINE. -->
+    <NoWarn>$(NoWarn);SER001;SER004;SER005;SER007;SER008;SER009</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- This is the SHIPPED analyzer, so it is built against a deliberately low Roslyn floor:
+         an analyzer cannot load in a host older than the version it was compiled against, and
+         this is the oldest consumer tooling supported, not the newest available. Anything
+         newer that Roslyn offers belongs in a shim, not in a version bump here. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.3.0" PrivateAssets="all" />
+    <!-- Build-time only. Pinned separately because it is never shipped: its version has nothing
+         to do with the host floor above. It also overrides the older version the reference
+         above brings in transitively, which cannot see descriptors declared outside the
+         analyzer type. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Release tracking for the diagnostics reported here; the analyzer equivalent of
+         PublicAPI.*.txt. -->
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Source shared with the library rather than duplicated: the generator and the runtime
+         must agree byte-for-byte on the hash, so they compile the same file.
+
+         Both files carry framework #if directives that survived the port precisely because
+         they are compiled here as well as into net10.0; each says so at the top. -->
+    <Compile Include="..\CodeBrix.Redis\Respite\Shared\AsciiHash.cs">
+      <Link>Shared/AsciiHash.cs</Link>
+    </Compile>
+    <Compile Include="..\CodeBrix.Redis\Respite\Shared\Experiments.cs">
+      <Link>Shared/Experiments.cs</Link>
+    </Compile>
+  </ItemGroup>
+
+</Project>

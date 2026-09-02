@@ -1,0 +1,28 @@
+using System.Diagnostics;
+using System.Threading.Tasks;
+using Xunit;
+
+namespace CodeBrix.Redis.Tests; //was previously: StackExchange.Redis.Tests;
+
+public class SocketTests(ITestOutputHelper output) : TestBase(output)
+{
+    [Fact]
+    public async Task check_for_socket_leaks()
+    {
+        Skip.UnlessLongRunning();
+        const int count = 2000;
+        for (var i = 0; i < count; i++)
+        {
+            await using var _ = Create(clientName: "Test: " + i);
+            // Intentionally just creating and disposing to leak sockets here
+            // ...so we can figure out what's happening.
+        }
+        // Force GC before memory dump in debug below...
+        CollectGarbage();
+
+        if (Debugger.IsAttached)
+        {
+            Debugger.Break();
+        }
+    }
+}

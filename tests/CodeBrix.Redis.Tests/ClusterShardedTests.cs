@@ -1,0 +1,379 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using SilverAssertions;
+using Xunit;
+
+namespace CodeBrix.Redis.Tests; //was previously: StackExchange.Redis.Tests;
+
+[RunPerProtocol]
+[Collection(NonParallelCollection.Name)]
+public class ClusterShardedTests(ITestOutputHelper output) : TestBase(output)
+{
+    protected override string GetConfiguration() => GetClusterConfiguration();
+
+    [Fact]
+    [Trait(TestCategories.Category, TestCategories.SimulatedConnectionFailure)]
+    public async Task test_sharded_pubsub_subscriber_against_reconnects()
+    {
+        Skip.UnlessLongRunning();
+        var channel = RedisChannel.Sharded(Me());
+        await using var conn = Create(allowAdmin: true, keepAlive: 1, connectTimeout: 3000, require: RedisFeatures.v7_0_0_rc1, allowSimulateConnectionFailure: true);
+        conn.IsConnected.Should().BeTrue();
+        var db = conn.GetDatabase();
+        (await db.PublishAsync(channel, "noClientReceivesThis")).Should().Be(0);
+        await Task.Delay(50, TestContext.Current.CancellationToken); // let the sub settle (this isn't needed on RESP3, note)
+
+        var pubsub = conn.GetSubscriber();
+        List<(RedisChannel, RedisValue)> received = [];
+        var queue = await pubsub.SubscribeAsync(channel);
+        _ = Task.Run(async () =>
+        {
+            // use queue API to have control over order
+            await foreach (var item in queue)
+            {
+                lock (received)
+                {
+                    if (item.Channel.IsSharded && item.Channel == channel) received.Add((item.Channel, item.Message));
+                }
+            }
+        }, TestContext.Current.CancellationToken);
+        conn.GetSubscriptionsCount().Should().Be(1);
+
+        await Task.Delay(50, TestContext.Current.CancellationToken); // let the sub settle (this isn't needed on RESP3, note)
+        await db.PingAsync();
+
+        for (int i = 0; i < 5; i++)
+        {
+            // check we get a hit
+            (await db.PublishAsync(channel, i.ToString())).Should().Be(1);
+        }
+        await Task.Delay(50, TestContext.Current.CancellationToken); // let the sub settle (this isn't needed on RESP3, note)
+
+        // this is endpoint at index 1 which has the hashslot for "testShardChannel"
+        var server = conn.GetServer(conn.GetEndPoints()[1]);
+        server.SimulateConnectionFailure(SimulatedFailureType.All);
+        SetExpectedAmbientFailureCount(2);
+
+        await Task.Delay(4000, TestContext.Current.CancellationToken);
+        for (int i = 0; i < 5; i++)
+        {
+            // check we get a hit
+            (await db.PublishAsync(channel, i.ToString())).Should().Be(1);
+        }
+        await Task.Delay(50, TestContext.Current.CancellationToken); // let the sub settle (this isn't needed on RESP3, note)
+
+        conn.GetSubscriptionsCount().Should().Be(1);
+        received.Count.Should().Be(10);
+        ClearAmbientFailures();
+    }
+
+    [Fact]
+    public async Task test_sharded_pubsub_subscriber_agains_hash_slot_migration()
+    {
+        Skip.UnlessLongRunning();
+        var channel = RedisChannel.Sharded(Me()); // invent a channel that will use SSUBSCRIBE
+        var key = (RedisKey)(byte[])channel!; // use the same value as a key, to test keyspace notifications via a single-key API
+        await using var conn = Create(allowAdmin: true, keepAlive: 1, connectTimeout: 3000, shared: false, require: RedisFeatures.v7_0_0_rc1);
+        conn.IsConnected.Should().BeTrue();
+        var db = conn.GetDatabase();
+        (await db.PublishAsync(channel, "noClientReceivesThis")).Should().Be(0);
+        await Task.Delay(50, TestContext.Current.CancellationToken); // let the sub settle (this isn't needed on RESP3, note)
+
+        var pubsub = conn.GetSubscriber();
+        var keynotify = RedisChannel.KeySpaceSingleKey(key, db.Database);
+        keynotify.IsSharded.Should().BeFalse(); // keyspace notifications do not use SSUBSCRIBE; this matters, because it means we don't get nuked when the slot migrates
+        keynotify.IsMultiNode.Should().BeFalse(); // we specificially want this *not* to be multi-node; we want to test that it follows the key correctly
+
+        int keynotificationCount = 0;
+        await pubsub.SubscribeAsync(keynotify, (_, _) => Interlocked.Increment(ref keynotificationCount));
+        try
+        {
+            List<(RedisChannel, RedisValue)> received = [];
+            var queue = await pubsub.SubscribeAsync(channel);
+            _ = Task.Run(async () =>
+            {
+                // use queue API to have control over order
+                await foreach (var item in queue)
+                {
+                    lock (received)
+                    {
+                        if (item.Channel.IsSharded && item.Channel == channel)
+                            received.Add((item.Channel, item.Message));
+                    }
+                }
+            }, TestContext.Current.CancellationToken);
+            conn.GetSubscriptionsCount().Should().Be(2);
+
+            await Task.Delay(50, TestContext.Current.CancellationToken); // let the sub settle (this isn't needed on RESP3, note)
+            await db.PingAsync();
+
+            for (int i = 0; i < 5; i++)
+            {
+                // check we get a hit
+                (await db.PublishAsync(channel, i.ToString())).Should().Be(1);
+                await db.StringIncrementAsync(key);
+            }
+
+            await Task.Delay(50, TestContext.Current.CancellationToken); // let the sub settle (this isn't needed on RESP3, note)
+
+            // lets migrate the slot for "testShardChannel" to another node
+            await DoHashSlotMigrationAsync();
+
+            await Task.Delay(4000, TestContext.Current.CancellationToken);
+            for (int i = 0; i < 5; i++)
+            {
+                // check we get a hit
+                (await db.PublishAsync(channel, i.ToString())).Should().Be(1);
+                await db.StringIncrementAsync(key);
+            }
+
+            await Task.Delay(50, TestContext.Current.CancellationToken); // let the sub settle (this isn't needed on RESP3, note)
+
+            conn.GetSubscriptionsCount().Should().Be(2);
+            received.Count.Should().Be(10);
+            Volatile.Read(ref keynotificationCount).Should().Be(10);
+            await RollbackHashSlotMigrationAsync();
+            ClearAmbientFailures();
+        }
+        finally
+        {
+            try
+            {
+                // ReSharper disable once MethodHasAsyncOverload - F+F
+                await pubsub.UnsubscribeAsync(keynotify, flags: CommandFlags.FireAndForget);
+                await pubsub.UnsubscribeAsync(channel, flags: CommandFlags.FireAndForget);
+                Log("Channels unsubscribed.");
+            }
+            catch (Exception ex)
+            {
+                Log($"Error while unsubscribing: {ex.Message}");
+            }
+        }
+    }
+
+    private Task DoHashSlotMigrationAsync() => MigrateSlotForTestShardChannelAsync(false);
+    private Task RollbackHashSlotMigrationAsync() => MigrateSlotForTestShardChannelAsync(true);
+
+    private async Task MigrateSlotForTestShardChannelAsync(bool rollback)
+    {
+        int hashSlotForTestShardChannel = 7177;
+        await using var conn = Create(allowAdmin: true, keepAlive: 1, connectTimeout: 5000, shared: false);
+        var servers = conn.GetServers();
+        IServer? serverWithPort7000 = null;
+        IServer? serverWithPort7001 = null;
+
+        string nodeIdForPort7000 = "780813af558af81518e58e495d63b6e248e80adf";
+        string nodeIdForPort7001 = "ea828c6074663c8bd4e705d3e3024d9d1721ef3b";
+        foreach (var server in servers)
+        {
+            string id = server.Execute("CLUSTER", "MYID").ToString();
+            if (id == nodeIdForPort7000)
+            {
+                serverWithPort7000 = server;
+            }
+            if (id == nodeIdForPort7001)
+            {
+                serverWithPort7001 = server;
+            }
+        }
+
+        IServer fromServer, toServer;
+        string fromNode, toNode;
+        if (rollback)
+        {
+            fromServer = serverWithPort7000!;
+            fromNode = nodeIdForPort7000;
+            toServer = serverWithPort7001!;
+            toNode = nodeIdForPort7001;
+        }
+        else
+        {
+            fromServer = serverWithPort7001!;
+            fromNode = nodeIdForPort7001;
+            toServer = serverWithPort7000!;
+            toNode = nodeIdForPort7000;
+        }
+
+        try
+        {
+            toServer.Execute("CLUSTER", "SETSLOT", hashSlotForTestShardChannel, "IMPORTING", fromNode).ToString().Should().Be("OK");
+            fromServer.Execute("CLUSTER", "SETSLOT", hashSlotForTestShardChannel, "MIGRATING", toNode).ToString().Should().Be("OK");
+            toServer.Execute("CLUSTER", "SETSLOT", hashSlotForTestShardChannel, "NODE", toNode).ToString().Should().Be("OK");
+            fromServer!.Execute("CLUSTER", "SETSLOT", hashSlotForTestShardChannel, "NODE", toNode).ToString().Should().Be("OK");
+        }
+        catch (RedisServerException ex) when (ex.Message == "ERR I'm already the owner of hash slot 7177")
+        {
+            Log("Slot already migrated.");
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task subscribe_to_wrong_server_async(bool sharded)
+    {
+        // the purpose of this test is to simulate subscribing while a node move is happening, i.e. we send
+        // the SSUBSCRIBE to the wrong server, get a -MOVED, and redirect; in particular: do we end up *knowing*
+        // where we actually subscribed to?
+        //
+        // note: to check our thinking, we also do this for regular non-sharded channels too; the point here
+        // being that this should behave *differently*, since there will be no -MOVED
+        var name = $"{Me()}:{Guid.NewGuid()}";
+        var channel = sharded ? RedisChannel.Sharded(name) : RedisChannel.Literal(name).WithKeyRouting();
+        await using var conn = Create(require: RedisFeatures.v7_0_0_rc1);
+
+        var asKey = (RedisKey)(byte[])channel!;
+        asKey.IsEmpty.Should().BeFalse();
+        var shouldBeServer = conn.GetServer(asKey); // this is where it *should* go
+
+        // now intentionally choose *a different* server
+        var server = conn.GetServers().First(s => !Equals(s.EndPoint, shouldBeServer.EndPoint));
+        Log($"Should be {Format.ToString(shouldBeServer.EndPoint)}; routing via {Format.ToString(server.EndPoint)}");
+
+        var subscriber = Assert.IsType<RedisSubscriber>(conn.GetSubscriber());
+        var serverEndpoint = conn.GetServerEndPoint(server.EndPoint);
+        serverEndpoint.EndPoint.Should().Be(server.EndPoint);
+        var queue = await subscriber.SubscribeAsync(channel, server: serverEndpoint);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        var actual = subscriber.SubscribedEndpoint(channel);
+
+        if (sharded)
+        {
+            // we should end up at the correct node, following the -MOVED
+            actual.Should().Be(shouldBeServer.EndPoint);
+        }
+        else
+        {
+            // we should end up where we *actually sent the message* - there is no -MOVED
+            actual.Should().Be(serverEndpoint.EndPoint);
+        }
+
+        Log("Unsubscribing...");
+        await queue.UnsubscribeAsync();
+        Log("Unsubscribed.");
+    }
+
+    [Fact]
+    public async Task keep_subscribed_through_slot_migration_async()
+    {
+        await using var conn = Create(require: RedisFeatures.v7_0_0_rc1, allowAdmin: true);
+        var name = $"{Me()}:{Guid.NewGuid()}";
+        var channel = RedisChannel.Sharded(name);
+        var subscriber = conn.GetSubscriber();
+        var queue = await subscriber.SubscribeAsync(channel);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        var actual = subscriber.SubscribedEndpoint(channel);
+        Assert.NotNull(actual);
+        var asKey = (RedisKey)(byte[])channel!;
+        asKey.IsEmpty.Should().BeFalse();
+        var slot = conn.GetHashSlot(asKey);
+        var viaMap = conn.ServerSelectionStrategy.Select(slot, RedisCommand.SSUBSCRIBE, CommandFlags.None, allowDisconnected: false);
+
+        Log($"Slot {slot}, subscribed to {Format.ToString(actual)} (mapped to {Format.ToString(viaMap?.EndPoint)})");
+        Assert.NotNull(viaMap);
+        viaMap.EndPoint.Should().Be(actual);
+
+        var oldServer = conn.GetServer(asKey); // this is where it *should* go
+
+        using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
+        {
+            // now publish... we *expect* things to have sorted themselves out
+            var msg = Guid.NewGuid().ToString();
+            var count = await subscriber.PublishAsync(channel, msg);
+            count.Should().Be(1);
+
+            Log("Waiting for message on original subscription...");
+            var received = await queue.ReadAsync(timeout.Token);
+            Log($"Message received: {received.Message}");
+            ((string)received.Message!).Should().Be(msg);
+        }
+
+        // now intentionally choose *a different* server
+        var newServer = conn.GetServers().First(s => !Equals(s.EndPoint, oldServer.EndPoint));
+
+        var nodes = await newServer.ClusterNodesAsync();
+        Assert.NotNull(nodes);
+        var fromNode = nodes[oldServer.EndPoint]?.NodeId;
+        var toNode = nodes[newServer.EndPoint]?.NodeId;
+        Assert.NotNull(fromNode);
+        Assert.NotNull(toNode);
+        nodes.GetBySlot(slot)?.EndPoint.Should().Be(oldServer.EndPoint);
+
+        var ep = subscriber.SubscribedEndpoint(channel);
+        Log($"Endpoint before migration: {Format.ToString(ep)}");
+        Log($"Migrating slot {slot} to {Format.ToString(newServer.EndPoint)}; node {fromNode} -> {toNode}...");
+
+        // see https://redis.io/docs/latest/commands/cluster-setslot/#redis-cluster-live-resharding-explained
+        WriteLog("IMPORTING", await newServer.ExecuteAsync("CLUSTER", "SETSLOT", slot, "IMPORTING", fromNode));
+        WriteLog("MIGRATING", await oldServer.ExecuteAsync("CLUSTER", "SETSLOT", slot, "MIGRATING", toNode));
+
+        while (true)
+        {
+            var keys = (await oldServer.ExecuteAsync("CLUSTER", "GETKEYSINSLOT", slot, 100)).AsRedisKeyArray()!;
+            Log($"Migrating {keys.Length} keys...");
+            if (keys.Length == 0) break;
+            foreach (var key in keys)
+            {
+                await conn.GetDatabase().KeyMigrateAsync(key, newServer.EndPoint, migrateOptions: MigrateOptions.None);
+            }
+        }
+
+        WriteLog("NODE (old)", await newServer.ExecuteAsync("CLUSTER", "SETSLOT", slot, "NODE", toNode));
+        WriteLog("NODE (new)", await oldServer.ExecuteAsync("CLUSTER", "SETSLOT", slot, "NODE", toNode));
+
+        void WriteLog(string caption, RedisResult result)
+        {
+            if (result.IsNull)
+            {
+                Log($"{caption}: null");
+            }
+            else if (result.Length >= 0)
+            {
+                var arr = result.AsRedisValueArray()!;
+                Log($"{caption}: {arr.Length} items");
+                foreach (var item in arr)
+                {
+                    Log($"  {item}");
+                }
+            }
+            else
+            {
+                Log($"{caption}: {result}");
+            }
+        }
+
+        Log("Migration initiated; checking node state...");
+        await Task.Delay(100, TestContext.Current.CancellationToken);
+        ep = subscriber.SubscribedEndpoint(channel);
+        Log($"Endpoint after migration: {Format.ToString(ep)}");
+        (ep is null || ep == newServer.EndPoint).Should().BeTrue("Target server after migration should be null or the new server");
+
+        nodes = await newServer.ClusterNodesAsync();
+        Assert.NotNull(nodes);
+        nodes.GetBySlot(slot)?.EndPoint.Should().Be(newServer.EndPoint);
+        await conn.ConfigureAsync();
+        conn.GetServer(asKey).Should().Be(newServer);
+
+        using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
+        {
+            // now publish... we *expect* things to have sorted themselves out
+            var msg = Guid.NewGuid().ToString();
+            var count = await subscriber.PublishAsync(channel, msg);
+            count.Should().Be(1);
+
+            Log("Waiting for message on moved subscription...");
+            var received = await queue.ReadAsync(timeout.Token);
+            Log($"Message received: {received.Message}");
+            ((string)received.Message!).Should().Be(msg);
+            ep = subscriber.SubscribedEndpoint(channel);
+            Log($"Endpoint after receiving message: {Format.ToString(ep)}");
+        }
+
+        Log("Unsubscribing...");
+        await queue.UnsubscribeAsync();
+        Log("Unsubscribed.");
+    }
+}

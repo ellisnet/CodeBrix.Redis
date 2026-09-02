@@ -1,0 +1,176 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>CodeBrix.Redis</AssemblyName>
+    <RootNamespace>CodeBrix.Redis</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Required by the ported RESPite buffer/reader code and the vectorised paths in the
+         client; upstream sets the same property repository-wide. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- SITUATIONAL EXCEPTION to the family "no nullable reference annotations" rule, on the
+         same grounds as CodeBrix.Platform.OpenGL: this assembly is a port of three upstream
+         libraries whose PUBLIC signatures are nullable-annotated. Stripping the annotations
+         would change what a consumer migrating off StackExchange.Redis / RESPite / RedLock.net
+         sees at compile time, which is exactly what this package exists to preserve.
+         Approved by Jeremy 2026-09-01. Do NOT copy this to a non-port CodeBrix library. -->
+    <Nullable>enable</Nullable>
+    <!-- DELIBERATE, NARROW EXCEPTION to the family "no NoWarn anywhere" rule, approved by
+         Jeremy 2026-09-01 (plan decision 4). These six SERxxxx identifiers are NOT analyzer
+         defect rules: they are the diagnostic IDs of the [Experimental] API gates declared in
+         this very assembly (Respite/Shared/Experiments.cs). C# raises an [Experimental]
+         diagnostic as an ERROR, and the language's only sanctioned opt-ins are NoWarn or
+         marking the consumer [Experimental] too; the latter cascades through 97 client-core
+         files and would reach public types, changing the drop-in surface. This line is that
+         opt-in acknowledgement - exactly what upstream's own Directory.Build.props carries -
+         and it suppresses no defect: every upstream [Experimental] attribute is still present,
+         so a CONSUMER of this package still sees the identical gate. NOTHING ELSE MAY EVER BE
+         ADDED TO THIS LINE. -->
+    <NoWarn>$(NoWarn);SER001;SER004;SER005;SER007;SER008;SER009</NoWarn>
+  </PropertyGroup>
+
+  <!--
+    Package / assembly version: date-stamped and auto-incrementing.
+
+    Format:  1.<x>.<y>.<z>   (every field is derived from UTC "now")
+
+      1  (major)     Always 1 for this library.
+      x  (minor)     Whole years since $(_VersionBaseYear).
+                     With base 2026: 2026=0, 2027=1, 2028=2, ...
+      y  (build)     Day of year, 1-based inclusive, UTC.
+                     Jan 1 = 1, Feb 1 = 32, Dec 31 = 365 (366 in a leap year).
+      z  (revision)  Minute of day, UTC, range 0 to 1439.
+                     00:00 = 0, 23:59 = 1439.
+
+    The version is always strictly increasing over time:
+      * within a day, z grows;
+      * at a day boundary, y increments and outranks z resetting to 0;
+      * at a (UTC) year boundary, x increments and outranks y and z resetting.
+
+    Notes / caveats:
+      * All fields read from System.DateTime.UtcNow, so a local dev build and a
+        UTC CI build agree on the value. Math.Floor on the minutes keeps z in
+        0..1439 (plain rounding could land on 1440 late in the day).
+      * Because the value depends on the clock, every build produces a NEW
+        version. With GeneratePackageOnBuild=true that means a fresh .nupkg on
+        each build, and two builds in the SAME UTC minute produce the SAME
+        version (so do not publish two packages from within one minute).
+      * This is date-stamp versioning, not SemVer: minor encodes the year and
+        major is pinned to 1, so major/minor do not signal API compatibility.
+      * To re-baseline the minor number, change _VersionBaseYear below.
+  -->
+  <PropertyGroup>
+    <_VersionBaseYear>2026</_VersionBaseYear>
+    <_VersionYears>$([MSBuild]::Subtract($([System.DateTime]::UtcNow.Year), $(_VersionBaseYear)))</_VersionYears>
+    <_VersionDayOfYear>$([System.DateTime]::UtcNow.DayOfYear)</_VersionDayOfYear>
+    <_VersionMinuteOfDay>$([System.Convert]::ToInt32($([System.Math]::Floor($([System.DateTime]::UtcNow.TimeOfDay.TotalMinutes)))))</_VersionMinuteOfDay>
+    <BuildVersion>1.$(_VersionYears).$(_VersionDayOfYear).$(_VersionMinuteOfDay)</BuildVersion>
+    <Version>$(BuildVersion)</Version>
+    <AssemblyVersion>$(BuildVersion)</AssemblyVersion>
+    <FileVersion>$(BuildVersion)</FileVersion>
+  </PropertyGroup>
+
+  <!-- NuGet package properties -->
+  <PropertyGroup>
+    <PackageId>CodeBrix.Redis.MitLicenseForever</PackageId>
+    <Product>CodeBrix.Redis</Product>
+    <Title>CodeBrix.Redis</Title>
+    <Authors>Jeremy Ellis</Authors>
+    <Description>A high-performance, fully managed Redis client for .NET, incorporating both synchronous and asynchronous usage. Connection multiplexing across a cluster, sentinel and replica topologies, the full command surface including streams and vector sets, RESP2 and RESP3, pub/sub, transactions, batches and Lua scripting, a low-level RESP protocol layer, and the Redlock distributed-lock algorithm. Ported from StackExchange.Redis, RESPite and RedLock.net.</Description>
+    <Copyright>Copyright (c) 2014 - 2026 Stack Exchange, Inc. Copyright (c) 2025 - 2026 Marc Gravell. Copyright (c) 2018 Sam Cook. Copyright (c) 2026 Jeremy Ellis and contributors</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/ellisnet/CodeBrix.Redis</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ellisnet/CodeBrix.Redis</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon-codebrix-128.png</PackageIcon>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <IsPackable>true</IsPackable>
+    <PackageTags>redis;cache;pubsub;messaging;async;resp;cluster;sentinel;streams;vector-set;lua;redlock;distributed-lock;CodeBrix</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ILoggerFactory is part of the public surface (ConfigurationOptions.LoggerFactory and
+         DefaultOptionsProvider.LoggerFactory), so this reference is required for drop-in
+         source compatibility, not merely for internal logging. -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+    <!-- CRC-16/XxHash for cluster hash slots and key hashing. -->
+    <PackageReference Include="System.IO.Hashing" Version="10.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The generators in this project emit source this assembly cannot compile without
+         (see MAINTAINER-README.txt). ReferenceOutputAssembly=false: it is a build-time tool
+         here, not a runtime dependency. -->
+    <ProjectReference Include="..\CodeBrix.Redis.Build\CodeBrix.Redis.Build.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\icon-codebrix-128.png" Pack="true" PackagePath="" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="" />
+    <None Include="..\..\AGENT-README.txt" Pack="true" PackagePath="" />
+    <None Include="..\..\THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="" />
+    <!-- NuGet auto-imports build/<PackageId>.props into every consuming project; that is the only way the
+         shipped analyzer can see a consumer's <RedisMinServerVersion>. The file is named for the PackageId,
+         not the assembly, because that is what NuGet looks for. -->
+    <None Include="build\CodeBrix.Redis.MitLicenseForever.props" Pack="true" PackagePath="build\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The two Redlock Lua scripts are loaded at type-initialisation time by
+         RedLock/Util/EmbeddedResourceLoader.cs, which looks them up BY NAME. The default manifest
+         name is derived from $(RootNamespace) and the folder path, so renaming the assembly, the
+         root namespace or the folder would silently change it and the loader would throw at first
+         use rather than at build time. LogicalName pins the two names instead; they are also the
+         names the loader passes, and RedLock.cs is the only caller.
+         These are embedded IN the assembly - they must never appear as package content. -->
+    <EmbeddedResource Include="RedLock\Lua\Extend.lua" LogicalName="CodeBrix.Redis.RedLock.Lua.Extend.lua" />
+    <EmbeddedResource Include="RedLock\Lua\Unlock.lua" LogicalName="CodeBrix.Redis.RedLock.Lua.Unlock.lua" />
+  </ItemGroup>
+
+  <!--
+    Ship CodeBrix.Redis.Build as the package's analyzer, and CodeBrix.Redis.CodeFixes alongside
+    it, so consumers get the same diagnostics the upstream StackExchange.Redis package provides.
+    analyzers/dotnet/cs is the conventional path and applies to every consumer target framework.
+    Roslyn itself is PrivateAssets="all" in both projects, so it is not carried along - the host
+    supplies it. That is also why the code fixes are a separate assembly: they need Workspaces,
+    which csc does not ship and the IDE does.
+
+    The paths are asked of the projects rather than assembled from bin/$(Configuration), so that
+    a change to the output layout cannot quietly produce a package with no analyzer in it. The
+    existence check is the point: packing without having built them is otherwise a silent
+    omission, and the failure mode downstream (no diagnostics, ever, for any consumer) is
+    invisible.
+  -->
+  <Target Name="_ResolveCodeBrixRedisAnalyzerForPackaging" BeforeTargets="_GetPackageFiles">
+    <MSBuild Projects="..\CodeBrix.Redis.Build\CodeBrix.Redis.Build.csproj"
+             Targets="GetTargetPath"
+             Properties="Configuration=$(Configuration);TargetFramework=netstandard2.0">
+      <Output TaskParameter="TargetOutputs" ItemName="_CodeBrixRedisAnalyzerAssembly" />
+    </MSBuild>
+
+    <!-- appended to the same item, so the checks and the pack below cover both without being
+         written twice -->
+    <MSBuild Projects="..\CodeBrix.Redis.CodeFixes\CodeBrix.Redis.CodeFixes.csproj"
+             Targets="GetTargetPath"
+             Properties="Configuration=$(Configuration);TargetFramework=netstandard2.0">
+      <Output TaskParameter="TargetOutputs" ItemName="_CodeBrixRedisAnalyzerAssembly" />
+    </MSBuild>
+
+    <Error Condition="'@(_CodeBrixRedisAnalyzerAssembly)' == ''"
+           Text="Could not resolve the CodeBrix.Redis.Build analyzer output; the package would ship without its analyzer." />
+    <Error Condition="!Exists('%(_CodeBrixRedisAnalyzerAssembly.FullPath)')"
+           Text="The CodeBrix.Redis.Build analyzer has not been built (%(_CodeBrixRedisAnalyzerAssembly.FullPath)); build it before packing." />
+
+    <ItemGroup>
+      <!-- no trailing separator: these items are absolute paths, and NuGet appends one itself -
+           a trailing slash here produces "analyzers/dotnet/cs//Foo.dll", which loads but is a
+           malformed package path -->
+      <None Include="@(_CodeBrixRedisAnalyzerAssembly)" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+</Project>

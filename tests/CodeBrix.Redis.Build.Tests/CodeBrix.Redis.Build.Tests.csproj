@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Tests for the generators and analyzers in src/CodeBrix.Redis.Build and the code fixes in
+    src/CodeBrix.Redis.CodeFixes. Ported from the upstream tests/StackExchange.Redis.Build.Tests
+    project.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>CodeBrix.Redis.Build.Tests</AssemblyName>
+    <RootNamespace>CodeBrix.Redis.Build.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <!-- DELIBERATE, NARROW EXCEPTION to the family "no NoWarn anywhere" rule, approved by
+         Jeremy 2026-09-01 (plan decision 4). These six SERxxxx identifiers are NOT analyzer
+         defect rules: they are the diagnostic IDs of the [Experimental] API gates that the
+         library under test declares (Respite/Shared/Experiments.cs). C# raises an [Experimental]
+         diagnostic as an ERROR, and the language's only sanctioned opt-ins are NoWarn or marking
+         each consuming test class [Experimental] too. This line is that opt-in acknowledgement -
+         exactly what upstream's own Directory.Build.props carries - and it suppresses no defect.
+         NOTHING ELSE MAY EVER BE ADDED TO THIS LINE. -->
+    <NoWarn>$(NoWarn);SER001;SER004;SER005;SER007;SER008;SER009</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="xunit.v3" Version="4.0.0" />
+    <PackageReference Include="SilverAssertions.ApacheLicenseForever" Version="1.0.237.1200" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Analyzer.Testing" Version="1.1.4" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.CodeFix.Testing" Version="1.1.4" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.9.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Referenced as libraries (not as analyzers) so the tests can instantiate the analyzers and
+         code fixes directly. -->
+    <ProjectReference Include="..\..\src\CodeBrix.Redis.Build\CodeBrix.Redis.Build.csproj"
+                      OutputItemType="" ReferenceOutputAssembly="true" />
+    <ProjectReference Include="..\..\src\CodeBrix.Redis.CodeFixes\CodeBrix.Redis.CodeFixes.csproj"
+                      OutputItemType="" ReferenceOutputAssembly="true" />
+    <!-- The analyzers resolve CodeBrix.Redis types by metadata name, so the test compilation must
+         actually reference the library; without this every test would pass by finding nothing. -->
+    <ProjectReference Include="..\..\src\CodeBrix.Redis\CodeBrix.Redis.csproj" />
+  </ItemGroup>
+
+</Project>

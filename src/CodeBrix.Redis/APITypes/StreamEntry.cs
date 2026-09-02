@@ -1,0 +1,83 @@
+using System;
+
+namespace CodeBrix.Redis; //was previously: StackExchange.Redis;
+
+/// <summary>
+/// Describes an entry contained in a Redis Stream.
+/// </summary>
+public readonly struct StreamEntry
+{
+    /// <summary>
+    /// Creates an stream entry.
+    /// </summary>
+    public StreamEntry(RedisValue id, NameValueEntry[] values)
+    {
+        Id = id;
+        Values = values;
+        IdleTime = null;
+        DeliveryCount = 0;
+    }
+
+    /// <summary>
+    /// Creates a stream entry.
+    /// </summary>
+    public StreamEntry(RedisValue id, NameValueEntry[] values, TimeSpan? idleTime, int deliveryCount)
+    {
+        Id = id;
+        Values = values;
+        IdleTime = idleTime;
+        DeliveryCount = deliveryCount;
+    }
+
+    /// <summary>
+    /// A null stream entry.
+    /// </summary>
+    public static StreamEntry Null { get; } = new StreamEntry(RedisValue.Null, Array.Empty<NameValueEntry>());
+
+    /// <summary>
+    /// The ID assigned to the message.
+    /// </summary>
+    public RedisValue Id { get; }
+
+    /// <summary>
+    /// The values contained within the message.
+    /// </summary>
+    public NameValueEntry[] Values { get; }
+
+    /// <summary>
+    /// Search for a specific field by name, returning the value.
+    /// </summary>
+    public RedisValue this[RedisValue fieldName]
+    {
+        get
+        {
+            var values = Values;
+            if (values != null)
+            {
+                for (int i = 0; i < values.Length; i++)
+                {
+                    if (values[i].name == fieldName)
+                        return values[i].value;
+                }
+            }
+            return RedisValue.Null;
+        }
+    }
+
+    /// <summary>
+    /// Delivery count - the number of times this entry has been delivered: 0 for new messages that haven't been delivered before,
+    /// 1+ for claimed messages (previously unacknowledged entries).
+    /// </summary>
+    public int DeliveryCount { get; }
+
+    /// <summary>
+    ///  Idle time in milliseconds - the number of milliseconds elapsed since this entry was last delivered to a consumer.
+    /// </summary>
+    /// <remarks>This member is populated when using <c>XREADGROUP</c> with <c>CLAIM</c>.</remarks>
+    public TimeSpan? IdleTime { get; }
+
+    /// <summary>
+    /// Indicates that the Redis Stream Entry is null.
+    /// </summary>
+    public bool IsNull => Id == RedisValue.Null && Values == Array.Empty<NameValueEntry>();
+}

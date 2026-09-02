@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Redis topology harness the test suites run against: it stands up standalone, replicated,
+    sentinel, cluster and TLS Redis configurations in containers via CodeBrix.Docker, hands the
+    tests their endpoints, and tears them down afterwards.
+
+    This REPLACES the upstream repository's tests/RedisConfigs, which relies on checked-in
+    Windows redis binaries, docker-compose, and per-topology .cmd/.sh scripts. Its shape is
+    repurposed from the RedisSetupTool sample in the CodeBrix.Docker repository, but the code
+    is vendored here: nothing in this repository's build, test or pack path may reference
+    another repository on the filesystem.
+
+    Not a test project itself - it contains no tests - so it carries no xUnit reference.
+
+    It deliberately does NOT reference src/CodeBrix.Redis either. The harness has to be usable
+    while the library is mid-port, and a readiness probe that needed the library under test to
+    compile would be no use on the day it does not. It talks RESP over a socket instead; see
+    Probe/RespConnection.cs.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>CodeBrix.Redis.TestHarness</AssemblyName>
+    <!-- The root namespace deliberately differs from the assembly name: the client library ships a
+         public type named CodeBrix.Redis.TestHarness (upstream StackExchange.Redis.TestHarness, the
+         unit-testing support type), and a namespace with the same full name collides with it (CS0434)
+         in any project that references both. -->
+    <RootNamespace>CodeBrix.Redis.Testing</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CodeBrix.Docker.MitLicenseForever" Version="1.0.244.840" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      The .conf files are the upstream repository's, adapted for a container (its "../Temp" data
+      directory becomes /data, and the TLS certificate paths become /certs). They are resolved at
+      run time through AppContext.BaseDirectory, so they have to travel to the output folder.
+      envoy.yaml is upstream's .docker/Envoy/envoy.yaml with the compose service name replaced by
+      the harness's cluster container name.
+    -->
+    <None Update="Configs/**/*.conf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Configs/Proxy/envoy.yaml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Tests for the CodeBrix.Redis.Respite.* protocol layer. Ported from the upstream
+    tests/RESPite.Tests project. Kept separate from CodeBrix.Redis.Tests because the protocol
+    layer is testable with no server at all, so this suite stays fast and dependency-free.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>CodeBrix.Redis.Respite.Tests</AssemblyName>
+    <RootNamespace>CodeBrix.Redis.Respite.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <!-- Matches the ported upstream test source, which is nullable-annotated throughout; see
+         the note in src/CodeBrix.Redis/CodeBrix.Redis.csproj. -->
+    <Nullable>enable</Nullable>
+    <!-- DELIBERATE, NARROW EXCEPTION to the family "no NoWarn anywhere" rule, approved by
+         Jeremy 2026-09-01 (plan decision 4). These six SERxxxx identifiers are NOT analyzer
+         defect rules: they are the diagnostic IDs of the [Experimental] API gates that the
+         library under test declares (Respite/Shared/Experiments.cs). C# raises an [Experimental]
+         diagnostic as an ERROR, and the language's only sanctioned opt-ins are NoWarn or marking
+         each consuming test class [Experimental] too. This line is that opt-in acknowledgement -
+         exactly what upstream's own Directory.Build.props carries - and it suppresses no defect.
+         NOTHING ELSE MAY EVER BE ADDED TO THIS LINE. -->
+    <NoWarn>$(NoWarn);SER001;SER004;SER005;SER007;SER008;SER009</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="xunit.v3" Version="4.0.0" />
+    <PackageReference Include="SilverAssertions.ApacheLicenseForever" Version="1.0.237.1200" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CodeBrix.Redis\CodeBrix.Redis.csproj" />
+  </ItemGroup>
+
+</Project>

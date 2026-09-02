@@ -1,0 +1,712 @@
+THIRD-PARTY SOFTWARE NOTICES AND INFORMATION
+
+CodeBrix.Redis is a high-performance, fully managed Redis client for .NET. It is
+a port: essentially all of its source code is derived from three open-source
+projects, all MIT-licensed. Each is recorded below with its origin, the version
+ported from, the copyright holders, the full text of its license, and the
+modifications made during the port.
+
+The CodeBrix.Redis project itself is licensed to you by Jeremy Ellis and
+contributors under the terms set forth in the LICENSE file at the root of this
+repository. That license is the MIT License, which is compatible with all three
+of the upstream licenses below; the upstream copyright notices are preserved
+here and in the shipped NuGet package, as those licenses require.
+
+If you have any questions about any third-party code or services referenced
+here, or if you believe that any third-party code has been included in
+CodeBrix.Redis in error, please open a new issue at:
+https://github.com/ellisnet/CodeBrix.Redis/issues
+
+================================================================================
+1. StackExchange.Redis
+================================================================================
+
+Project:      StackExchange.Redis
+Source:       https://github.com/StackExchange/StackExchange.Redis
+Ported from:  tag 3.1.31 (commit 90bbf1fcba1c9cc464c94b96d16c2706f590383f)
+Authors:      Stack Exchange, Inc.; Marc Gravell; Nick Craver
+Copyright:    Copyright (c) 2014 Stack Exchange
+              Copyright (c) 2014 - 2026 Stack Exchange, Inc.
+License:      MIT
+
+Ported source (production):
+    src/StackExchange.Redis/**                -> src/CodeBrix.Redis/**
+    eng/StackExchange.Redis.Build/**          -> src/CodeBrix.Redis.Build/**
+    eng/StackExchange.Redis.CodeFixes/**      -> src/CodeBrix.Redis.CodeFixes/**
+
+Ported source (test support and tests):
+    toys/StackExchange.Redis.Server/**        -> tests/CodeBrix.Redis.TestServer/**
+    tests/StackExchange.Redis.Tests/**        -> tests/CodeBrix.Redis.Tests/**
+    tests/StackExchange.Redis.Build.Tests/**  -> tests/CodeBrix.Redis.Build.Tests/**
+
+Modifications made during the port:
+  * The root namespace StackExchange.Redis, and every namespace beneath it, was
+    renamed to CodeBrix.Redis. Every ported file records its origin on its
+    namespace line as "//was previously: <original namespace>;".
+  * The Roslyn analyzers and source generators resolve library types by
+    fully-qualified metadata name and emit source containing fully-qualified
+    names, so every such string literal was renamed along with the namespaces:
+    "StackExchange.Redis.ITransaction", ".Condition", ".IBatch",
+    ".IRedisAsync", ".ITransactionAsync", ".IConnectionMultiplexer",
+    ".CommandFlags", ".RedisKey", ".RedisChannel" and ".StreamPosition" all
+    became "CodeBrix.Redis.*"; "RESPite.AsciiHashAttribute" became
+    "CodeBrix.Redis.Respite.AsciiHashAttribute"; the emitted "using
+    StackExchange.Redis;" and every emitted "global::StackExchange.Redis." /
+    "global::RESPite." became the CodeBrix.Redis equivalents; the symbol-shape
+    namespace matches were re-nested for the new namespace depth; and the
+    assembly name the auto-database generator will act on became
+    "CodeBrix.Redis". The SERxxxx diagnostic IDs were NOT renamed: an ID is a
+    public contract once shipped, written into consumers' NoWarn entries,
+    .editorconfig severities and inline suppressions.
+  * The diagnostics' help links still point at the upstream documentation site,
+    https://seredis.dev/rules/<id> and https://seredis.dev/SyncOverAsync. The
+    rules are ported unchanged, report the same IDs and describe the same code
+    shapes, and those pages are the only published prose that explains them;
+    sending a consumer to a page that does not exist would serve them worse.
+    Everything else a consumer of this package reads - diagnostic titles,
+    messages, descriptions and the doc comments naming the package the analyzers
+    ship in - names CodeBrix.Redis.
+  * Upstream silences six [Experimental] API gates - SER001, SER004, SER005,
+    SER007, SER008 and SER009 - repository-wide with a NoWarn line in its
+    Directory.Build.props. Those identifiers are not defect rules: they are the
+    diagnostic IDs of the [Experimental] attributes the ported source itself
+    declares, and C# raises an [Experimental] diagnostic as a compile ERROR
+    whose only sanctioned opt-ins are NoWarn or marking every consumer
+    [Experimental] too. This repository carries the same six identifiers, and
+    nothing else, on a commented NoWarn line in CodeBrix.Redis.csproj,
+    CodeBrix.Redis.Build.csproj and the test projects that need it. Every
+    upstream [Experimental] attribute is present and unchanged, so a consumer of
+    this package sees exactly the gates upstream's consumers see. The generated
+    code emits its own "#pragma warning disable SER004", as upstream's does.
+  * Upstream builds eng/StackExchange.Redis.Build and
+    eng/StackExchange.Redis.CodeFixes with ImplicitUsings enabled and the
+    CodeBrix family uses no implicit or global usings, so every ported file was
+    given an explicit using block. Two upstream using directives that nothing in
+    the file referenced were dropped with that rewrite: System.Buffers in
+    AsciiHashGenerator.cs and System.Reflection.Metadata.Ecma335 in
+    AutoDatabaseGenerator.cs.
+  * The target framework was narrowed from net461/netstandard2.0/net472/net6.0/
+    net8.0/net10.0 to net10.0 alone. Conditional-compilation branches selecting
+    between framework-specific implementations were evaluated for .NET 10 and
+    the dead branch removed, along with the #if/#else/#endif directives
+    themselves. Files whose entire body was a dead branch were not ported.
+  * The package references that existed only to serve the removed down-level
+    target frameworks were dropped, because .NET 10 supplies those APIs in the
+    box: System.IO.Pipelines, Microsoft.Bcl.AsyncInterfaces,
+    System.Threading.Channels, System.IO.Compression, and
+    System.Runtime.InteropServices.RuntimeInformation.
+  * Strong-name signing was removed; StackExchange.Redis.snk was not ported.
+  * The upstream repository's build infrastructure - Nerdbank.GitVersioning,
+    the AppVeyor and GitHub Actions configuration, the StyleCop.Analyzers and
+    Microsoft.CodeAnalysis.PublicApiAnalyzers analyzer references, the docs
+    site, and the benchmark projects - was not ported. The upstream
+    PublicAPI.Shipped.txt files are retained as a reference checklist only and
+    are not wired to an analyzer.
+  * The test suites' third-party dependencies were replaced: NSubstitute with
+    CodeBrix.TestMocks (6 files), and Newtonsoft.Json with System.Text.Json (3
+    files - JsonSerializer.Serialize for the two anonymous-type payloads, and
+    JsonNode for the one dynamic member access, since System.Text.Json has no
+    dynamic mode). Three more upstream test package references were dropped
+    outright: GitHubActionsTestLogger (this family carries no CI files),
+    xunit.v3.runner.console (the family uses xunit.runner.visualstudio) and
+    System.Private.Uri (a security pin for a down-level target framework).
+  * 270 of the 272 upstream .cs files under tests/StackExchange.Redis.Tests were
+    ported into tests/CodeBrix.Redis.Tests (271 files, 59,792 lines, including
+    the RedLock suite of section 3 and one new fixture). Two were not ported:
+    GlobalSuppressions.cs, whose entire content was 14 [SuppressMessage]
+    attributes naming IDE, Roslynator and CA rules that are not enabled here (and
+    this repository carries no suppression anywhere); and TaskExtensions.cs, whose
+    whole body sat inside "#if !NET" - a Task.WaitAsync polyfill that .NET 10
+    supplies in the box. Two non-.cs files were also not ported: App.config, a
+    .NET Framework assembly-binding redirect for System.Buffers, and the two-line
+    test README pointing at seredis.dev/Testing, superseded by this repository's
+    MAINTAINER-README.txt.
+  * Helpers/redis-sharp.cs was NOT ported, and the one test that used it went with
+    it. That file is redis-sharp (Copyright 2010 Novell, Inc.; Miguel de Icaza;
+    "new BSD license"), which upstream vendors into its test project purely to time
+    this library's asynchronous API against a 2010 synchronous client. It would have
+    been a FOURTH third-party licence in this repository, carried for a comparison
+    that is off by default (double-gated behind the container tier and
+    Config.RunLongRunning) and no longer meaningful. PerformanceTests.cs keeps its
+    other test, and says at the site what was dropped and why; nothing else in the
+    272-file tree referenced it.
+  * The test fixtures were redesigned onto tests/CodeBrix.Redis.TestHarness, because
+    upstream's tests/RedisConfigs is not ported (see the bullet below). A new
+    assembly fixture, Helpers/RedisTopologyFixture.cs, owns the containers for the
+    run; Helpers/TestConfig.cs derives every endpoint default from the harness's own
+    constants rather than from a literal, so the two cannot drift, and reads
+    RedisTestConfig.json with System.Text.Json; and Helpers/Skip.cs expresses the
+    container-tier gate in one place, Skip.IfNoContainers(), which
+    Skip.IfNoServer/IfNoCluster/IfNoSentinel/IfNoFailoverPair/IfNoTlsServer and
+    TestBase.Create() all consult BEFORE opening a socket. Upstream's expired
+    RedisLabs authority, redislabs_ca.pem, is carried across unmodified and inert -
+    the tests that use it skip unless a developer sets Config.RedisLabsSslServer, and
+    a RedisLabs authority is not something this repository can re-issue. The three
+    Certificates/*.pem files, which upstream generated for testing and which run to
+    2048, are carried as they are; they back a certificate-chain unit test with no
+    server involved.
+  * The whole suite was converted to the CodeBrix test conventions in the same pass:
+    snake_case test method names, //Arrange - //Act - //Assert on the bodies that
+    have that shape, SilverAssertions' fluent form in place of Assert.* (with the
+    xUnit form deliberately kept where it is not an assertion - Skip/Fail - where its
+    return value is used - Throws/IsType/Single - where the fluent equivalent would
+    compare differently - StrictEqual, the StringComparison and IEqualityComparer
+    overloads, Assert.Equal on untyped object values, which compares IEnumerables
+    element by element - and where its [NotNull] / [DoesNotReturnIf] annotations
+    carry the compiler's null-state to the next line, which SilverAssertions does not
+    do and which this NRT-enabled suite needs), and
+    TestContext.Current.CancellationToken threaded through every cancellable call
+    (xUnit1051, and xUnit1069 for the tests that declare a Timeout).
+  * The analyzer and generator tests were converted to the CodeBrix test
+    conventions in the same pass: snake_case test method names, and a Tests
+    suffix on every file and class that holds tests (SER300.cs became
+    SER300Tests.cs, DetectionShape.cs became DetectionShapeTests.cs, and so on).
+    The shared verifier types keep their names, because they hold no tests. The
+    embedded test sources are upstream's, with their "using StackExchange.Redis;"
+    line renamed like everything else. TestSetup's Preamble constant still
+    contains the text "#pragma warning disable StringToRedisValue": that is a
+    line of the sample source each test compiles, not a suppression in this
+    repository's own build.
+  * The upstream test-server configuration under tests/RedisConfigs was ported in
+    part. Its per-topology Redis configuration files - Basic/, Cluster/,
+    Failover/ and Sentinel/, plus .docker/Envoy/envoy.yaml - were carried over
+    into tests/CodeBrix.Redis.TestHarness/Configs/ and adapted for a container:
+    the "../Temp" data directory became /data, the cluster configuration files
+    became per-node paths relative to it, each cluster node was given
+    cluster-announce-ip 127.0.0.1 and its own append directory, the TLS
+    certificate paths moved to /certs, and the Envoy upstream address became the
+    harness's cluster container name. One line was changed rather than adapted:
+    notify-keyspace-events went from upstream's "AKE" to "AKESTIV", because Redis
+    8.10.1 - the version the harness runs - supports four further notification
+    classes (S sub-keyspace, T sub-keyevent, I sub-keyspace-item, V
+    sub-keyspace-event) that the ported suite has tests for, and those tests skip
+    themselves when the server's configuration does not carry the token. Each .conf
+    file says so at the line. The rest of that folder was NOT ported: the
+    checked-in Windows Redis binaries under 3.0.503/, the .cmd and .sh start
+    scripts, the docker-compose file and its Dockerfiles, the Temp/ scratch
+    folder, and the checked-in certificates under Certs/ - which expired on
+    2023-08-24 and cannot be re-signed, because the authority's private key is not
+    in the upstream repository. tests/CodeBrix.Redis.TestHarness stands the
+    equivalent topologies up in containers and generates its own TLS material at
+    run time.
+  * The RESPite and StackExchange.Redis assemblies were merged into the single
+    CodeBrix.Redis assembly; the InternalsVisibleTo relationship between them is
+    consequently no longer needed and was dropped.
+  * Four upstream .cs files under src/StackExchange.Redis were not ported for a
+    .NET 10 reason - either nothing of the file survives on .NET 10 or it would
+    be a duplicate declaration. (A fifth, GlobalSuppressions.cs, was not ported
+    for a different reason, recorded further below with the other suppressions.)
+    The four: AssemblyInfoHack.cs (its whole content is
+    [assembly: CLSCompliant(true)] and [module: SkipLocalsInit], both already
+    declared by the ported RESPite sources - a second declaration is CS0579);
+    LoggingPipe.cs and DebuggingAids.cs (entirely inside "#if LOGOUTPUT" /
+    "#if VERBOSE", symbols no upstream build defines - the three partial methods
+    DebuggingAids.cs implemented are declared without an accessibility modifier,
+    so C# elides them exactly as in upstream's release builds); and
+    AwaitableMutex.netfx.cs (entirely inside "#if !NET"; AwaitableMutex.net.cs
+    is the live half and is ported).
+  * Eight of the ten upstream .cs files under toys/StackExchange.Redis.Server were
+    ported, into tests/CodeBrix.Redis.TestServer. The namespace
+    StackExchange.Redis.Server became CodeBrix.Redis.TestServer; TypedRedisValue.cs
+    declares the library root namespace rather than that one, and keeps that
+    placement as CodeBrix.Redis. Two files were not ported.
+    GlobalSuppressions.cs held a single [SuppressMessage] for the IDE0066 code-style
+    suggestion on TypedRedisValue.ToString(); this repository enables no code-style
+    analysis in the build - it has no .editorconfig and sets neither
+    EnforceCodeStyleInBuild nor an AnalysisMode - so that rule cannot fire here and
+    the attribute would have been a suppression of nothing.
+    RespSocketServer.cs is a file whose entire body is one "/* left for ref only */"
+    comment wrapping code written against Pipelines.Sockets.Unofficial, a package
+    this repository does not take; nothing was lost, because upstream keeps the same
+    commented block inside tests/StackExchange.Redis.Tests/InProcessTestServer.cs,
+    which was ported.
+  * The test server's upstream project silences CS1591 in its csproj. This
+    repository does not carry that: the project does not generate a documentation
+    file, so the warning cannot fire. Its NoWarn line carries the six [Experimental]
+    gate identifiers described above plus StringToRedisValue, which gates the
+    implicit string -> RedisValue conversion in DEBUG builds only and which the
+    server uses throughout - the same opt-in upstream applies to its own test side
+    in tests/Directory.Build.targets and toys/StackExchange.Redis.Server.csproj, and
+    it is never applied to src/CodeBrix.Redis. Two settings that upstream inherits
+    from its repository-wide Directory.Build.props are stated in that csproj instead,
+    because this repository deliberately has no such file: AllowUnsafeBlocks, and the
+    analyzer ProjectReference to CodeBrix.Redis.Build - which is load-bearing rather
+    than cosmetic, since the ASCII-hash source generator writes the body of
+    HelloSubFieldsMetadata.TryParseCI.
+  * Two files could not keep the family's file-scoped namespace, and each says
+    so at the top. Availability/MultiGroupMultiplexer.cs declares two namespaces
+    (StackExchange.Redis and a nested .Availability), which C# forbids in a
+    file-scoped file, so its two ConnectionMultiplexer.ConnectGroupAsync
+    overloads moved to Availability/MultiGroupMultiplexer.ConnectGroup.cs,
+    following upstream's own file-nesting convention for that type; nothing else
+    moved and no member is in both halves. RedisFeatures.cs declares
+    VersionExtensions in the GLOBAL namespace, outside the namespace block, so
+    it keeps upstream's block-scoped namespace and that type keeps the namespace
+    upstream gives it.
+  * Every "#pragma warning disable" in the ported source was resolved at source
+    rather than replicated - this repository has no pragmas. The suppressions
+    covering StyleCop, Roslynator and the public-API analyzer were simply
+    dropped, because none of those analyzers is referenced here. The ones for
+    real compiler diagnostics were fixed:
+      - CS1591 (undocumented public members): XML documentation comments were
+        written for all 59 KeyNotificationType members and for the 37
+        LoggingTunnel nested-transport and nested-stream members that had none.
+      - CS0618 (calls to this library's own [Obsolete] members): each obsolete
+        member keeps its exact upstream signature, accessibility and message and
+        now forwards to a new non-obsolete internal core member that holds its
+        body, and the library's own callers name the core -
+        PhysicalBridge.TryWriteSyncCore and WriteMessageTakingWriteLockSyncCore,
+        ServerEndPoint.TryWriteSyncCore,
+        ConnectionMultiplexer.TryPushMessageToBridgeSyncCore, and (from the
+        RESPite half) RespReader.TryReadNextCore. Three sites could not use that
+        shape and are noted individually: the three internal static socket
+        helpers moved off the [Obsolete] SocketManager type onto a new
+        non-obsolete internal SocketFactory class in the same file
+        (SocketManager itself, including its [Obsolete] attribute and its whole
+        public surface, is unchanged); ConfigurationOptions.SocketManager keeps
+        its obsolete
+        public property but stores the value in a plain private field so Clone()
+        and Reset() can copy and clear it; and the two switch arms naming the
+        [Obsolete] enum member SaveType.ForegroundSave match a non-obsolete
+        constant expressed relative to the member declared before it. In one
+        place the attribute itself could not survive: IMappableRedisArgs.Map is
+        an INTERNAL interface member that upstream marks [Obsolete] purely as an
+        in-repository trap and then calls anyway at one sanctioned site. C#
+        offers no way to call an obsolete member from non-obsolete code without
+        a suppression, so upstream's attribute and its message are recorded as a
+        comment at the declaration instead. Nothing a consumer can see changes -
+        the interface is internal - and the compile-time guard that matters (the
+        "ref this" on MapInPlace) is untouched.
+      - SYSLIB0057 (obsolete X509Certificate2 constructors, three sites in
+        ConfigurationOptions.cs): switched to X509CertificateLoader with the
+        behaviour-equivalent overload - LoadPkcs12 for the PKCS#12 blob exported
+        from a PEM pair, LoadPkcs12FromFile for the PFX-with-password overload,
+        and LoadCertificateFromFile for the issuer certificate (verified against
+        the upstream suite's own .pem issuer fixtures). Each site says so.
+      - CS0420 (PhysicalBridge.state): the field's "volatile" modifier was
+        dropped and every plain read now goes through Volatile.Read, which is
+        the same acquire barrier those reads already had. The two mutating sites
+        already use Interlocked, and the "ref State" alias in OnHeartbeat was
+        already non-volatile under upstream's declaration - that is precisely
+        what CS0420 reports - so the memory semantics are unchanged.
+      - SER308: see the analyzer note below.
+  * All 35 [SuppressMessage] attributes were removed, and GlobalSuppressions.cs
+    was deleted. Fourteen of them lived in that file and named IDE, Roslynator
+    and CA rules, with Target strings that still named StackExchange.Redis
+    doc-IDs; the rest were in-source. None of the rules they name is enabled in
+    this repository's build, and the build is clean without them.
+  * One deliberate behavioural change was made to a ported analyzer.
+    QueuedResultAnalyzer does not report SER308 ("blocking on a task through the
+    library's Wait helpers") when the compilation being analysed is
+    CodeBrix.Redis itself. SER308 tells a CONSUMER not to reach for
+    Wait/WaitAll/TryWait; inside this library those helpers ARE the synchronous
+    surface - the IRedisAsync forwarders every decorator must implement, and the
+    sync-over-async in RedisBase and CursorEnumerable that no rewrite can remove
+    without changing behaviour - and upstream marks all 27 of those sites
+    intentional with "#pragma warning disable SER308". The exemption is a single
+    documented assembly-name check, gated exactly as the ported
+    AutoDatabaseGenerator already gates itself, and it applies to SER308 alone.
+    A consumer's compilation has a different assembly name, so what a consumer
+    sees from SER308 - and from every other SERxxxx rule - is byte-for-byte
+    upstream's behaviour, on the same diagnostic IDs.
+  * That same assembly-name exemption was extended to this repository's own test
+    assembly, CodeBrix.Redis.Tests, and there it covers SER301 as well as SER308.
+    The ported suite is upstream's, and upstream carries 17
+    "#pragma warning disable SER308" lines and 2 for SER301 inside it: those tests
+    exist to exercise the SYNCHRONOUS API and the transaction surface itself, so
+    awaiting instead of blocking, or replacing a WATCH transaction with the single
+    atomic command SER301 suggests, would delete what the test tests. Two
+    documented assembly-name checks - one in QueuedResultAnalyzer for SER308, one
+    in TransactionAnalyzer for SER301 - carry that instead of a pragma. The library
+    gate above is unchanged and SER301 is NOT exempt in src/CodeBrix.Redis; no
+    other rule and no other assembly is affected, so a consumer still sees
+    byte-for-byte upstream's behaviour on every SERxxxx ID.
+  * The strings by which the library identifies ITSELF now say
+    CodeBrix.Redis: the lib-name sent to the server on the CLIENT SETINFO
+    handshake ("SE.Redis" ->
+    "CodeBrix.Redis"), the default client name sent on CLIENT SETNAME
+    ("StackExchange.Redis" / "(SE.Redis-v" -> "CodeBrix.Redis" /
+    "(CodeBrix.Redis-v"), the three worker thread names ("SE.Redis Sync Reader",
+    "StackExchange.Redis Backlog", and - from the RESPite half of section 2 -
+    "SE.Redis Sync Writer"), the two identical
+    [Obsolete] messages on SocketManager, the two connect LoggerMessage
+    templates, and the doc-comment sentences that state those defaults. A client
+    should not misreport its identity. Nothing else about the wire protocol
+    changed: command names, argument order, RESP framing and the LIB-VER value
+    are byte-identical to upstream's.
+  * build/StackExchange.Redis.props was ported as
+    build/CodeBrix.Redis.MitLicenseForever.props and is packed under build/ -
+    NuGet auto-imports build/<PackageId>.props only, and this package's id is
+    not its assembly name. Its CompilerVisibleProperty item for
+    RedisMinServerVersion keeps that property name unchanged, so a consumer's
+    existing
+    <RedisMinServerVersion> setting keeps working after the swap.
+
+License text:
+
+The MIT License (MIT)
+
+Copyright (c) 2014 Stack Exchange
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+================================================================================
+2. RESPite
+================================================================================
+
+Project:      RESPite
+Source:       https://github.com/StackExchange/StackExchange.Redis
+              (src/RESPite; published separately as the RESPite NuGet package)
+Ported from:  tag 3.1.31 (commit 90bbf1fcba1c9cc464c94b96d16c2706f590383f)
+Author:       Marc Gravell
+Copyright:    Copyright (c) 2025 - 2026 Marc Gravell
+License:      MIT (the StackExchange.Redis repository LICENSE, reproduced in
+              section 1 above, covers this project; it lives in the same
+              repository)
+
+RESPite is the low-level RESP protocol library used as the IO core of
+StackExchange.Redis v3 and later.
+
+Ported source (production):
+    src/RESPite/**        -> src/CodeBrix.Redis/Respite/**
+
+Ported source (tests):
+    tests/RESPite.Tests/** -> tests/CodeBrix.Redis.Respite.Tests/**
+
+Modifications made during the port:
+  * The root namespace RESPite, and every namespace beneath it, was renamed to
+    CodeBrix.Redis.Respite. Every ported file records its origin on its
+    namespace line as "//was previously: <original namespace>;".
+  * The target framework was narrowed to net10.0 alone, on the same terms as
+    section 1. Seven of the 39 upstream .cs files were consequently not ported,
+    because their entire body was a branch that .NET 10 does not compile:
+    Shared/FrameworkShims.cs, Shared/FrameworkShims.Encoding.cs,
+    Shared/FrameworkShims.Sequence.cs, Shared/FrameworkShims.Sockets.cs,
+    Shared/FrameworkShims.Stream.cs and Shared/NullableHacks.cs, which declared
+    down-level polyfills in the System.Runtime.CompilerServices, System.Text,
+    System.Buffers, System.Net.Sockets, System.IO and
+    System.Diagnostics.CodeAnalysis namespaces that .NET 10 supplies in the box;
+    and Buffers/MemoryTrackedPool.cs, which sits entirely inside "#if
+    TRACK_MEMORY", a symbol no build defines. Shared/SkipLocalsInit.cs kept its
+    [module: SkipLocalsInit] and lost its polyfill half. AssemblyInfo.cs was
+    ported as-is; note that its [assembly: CLSCompliant(true)] and
+    SkipLocalsInit.cs's [module: SkipLocalsInit] are each also declared by
+    StackExchange.Redis's AssemblyInfoHack.cs, and only one declaration of each
+    can exist in the merged assembly. The upstream readme.md was not ported.
+  * Two framework #if directives DID survive, in Shared/AsciiHash.cs and
+    Shared/Experiments.cs, and each file says so at the top. Those two files are
+    compiled into src/CodeBrix.Redis.Build (netstandard2.0) as well as into the
+    net10.0 library - the generator and the runtime must agree byte for byte on
+    the hash - so both branches remain reachable. Shared/Experiments.cs also
+    keeps upstream's block-scoped namespaces, because it declares two of them and
+    C# forbids a file-scoped namespace in such a file.
+  * XML documentation comments were written for the public surface. Upstream
+    builds this project with GenerateDocumentationFile disabled; CodeBrix.Redis
+    ships one documentation file for the merged assembly, so the RESPite public
+    types are documented rather than exempted.
+  * Upstream compiles this code with several diagnostics suppressed - a
+    repository-wide NoWarn covering the SER004 [Experimental] gate that every
+    public RESPite type carries, and in-source "#pragma warning disable"
+    directives for CS0282, CS0618, CA2015, and the StyleCop and public-API
+    analyzer rules. This repository carries the same six SER [Experimental]
+    identifiers on the NoWarn line described in section 1, and nothing else, so
+    the internal consumers of those gated types are byte-for-byte upstream's;
+    every other suppression was resolved in the source instead, without changing
+    behaviour or the public surface: RespReader's two buffer
+    fields moved from RespReader.Span.cs into RespReader.cs and its DEBUG-only
+    VectorizeDisabled property moved from RespReader.Debug.cs, so that every
+    instance field of that partial struct is declared in one part; the body of
+    the [Obsolete] RespReader.TryReadNext() moved to a new internal
+    TryReadNextCore() that the library's own callers use and the obsolete member
+    forwards to; and BlockBuffer's DEBUG-only leak-detection finalizer moved onto
+    a separate nested object, so no finalizer is declared on a type derived from
+    MemoryManager<T>. Every one of these carries a comment at the site saying
+    what upstream does and why this differs. The StyleCop, public-API and IDE
+    code-style pragmas and [SuppressMessage] attributes were simply dropped with
+    the analyzers they refer to; none of those analyzers is referenced here.
+  * Upstream builds this project with ImplicitUsings enabled and the CodeBrix
+    family uses no implicit or global usings, so every ported file was given an
+    explicit using block.
+  * Strong-name signing was removed.
+  * The RESPite assembly was merged into CodeBrix.Redis; see section 1.
+  * The upstream PublicAPI listings under src/RESPite/PublicAPI were carried into
+    src/CodeBrix.Redis/Respite/PublicAPI as plain reference files. They are not
+    AdditionalFiles, are not wired to an analyzer, and are not packed.
+  * The tests were converted to the CodeBrix test conventions in the same pass:
+    snake_case test method names, //Arrange - //Act - //Assert comments, and
+    SilverAssertions' fluent form in place of Assert.*. The upstream theory data
+    and the custom [Resp] data attribute are unchanged. The upstream class
+    RespScannerTests was renamed RespScanStateTests, after the class it covers.
+    The upstream xunit.v3.runner.console and System.IO.Pipelines package
+    references were dropped - the family uses xunit.runner.visualstudio, and
+    System.IO.Pipelines is in the box on .NET 10. Upstream brackets one foreach
+    in RespReaderTests with "#pragma warning disable SERDBG" - a DEBUG-only
+    [Experimental] gate on AggregateEnumerator.Current that nudges library code
+    towards .Value. That test method carries [Experimental("SERDBG")] instead,
+    naming the same identifier on the one member that needs it; SERDBG is
+    deliberately NOT on the project's NoWarn line.
+
+================================================================================
+3. RedLock.net
+================================================================================
+
+Project:      RedLock.net
+Source:       https://github.com/samcook/RedLock.net
+Ported from:  tag release-2.3.2 (commit dcfe373)
+Author:       Sam Cook
+Copyright:    Copyright (c) 2018 Sam Cook
+License:      MIT
+
+An implementation of the Redlock distributed lock algorithm.
+
+Ported source (production):
+    RedLockNet.Abstractions/** -> src/CodeBrix.Redis/RedLock/**
+    RedLockNet.SERedis/**      -> src/CodeBrix.Redis/RedLock/**
+
+    20 of the 21 upstream .cs files landed. RedLockNet.SERedis/AssemblyInfo.cs
+    was not ported: its only content was an InternalsVisibleTo carrying the
+    strong-name public key of the upstream test assembly, and this repository
+    declares its own in src/CodeBrix.Redis/InternalsVisibleTo.cs.
+
+Ported source (tests):
+    RedLockNet.Tests/**        -> tests/CodeBrix.Redis.Tests/RedLock/**
+
+    The single upstream test file (605 lines, 21 tests) landed as
+    tests/CodeBrix.Redis.Tests/RedLock/RedLockTests.cs. It is not a separate test
+    project here: RedLock/ is a FOLDER, and the file declares the suite's own
+    namespace, CodeBrix.Redis.Tests. A namespace segment named RedLock would
+    shadow the type of the same name (CS0118), which is also why the one cast in
+    that file is written global::CodeBrix.Redis.RedLock.RedLock.
+    RedLockNet.Tests/RedisConfig/** was not ported; tests/CodeBrix.Redis.TestHarness
+    stands the servers up instead, exactly as for section 1's tests/RedisConfigs.
+
+The embedded Lua resources Lua/Extend.lua and Lua/Unlock.lua were ported
+verbatim, byte for byte, and remain embedded resources.
+
+Modifications made during the port:
+  * The RedLockNet and RedLockNet.SERedis namespaces, and every namespace
+    beneath them, were merged and renamed to CodeBrix.Redis.RedLock. The two
+    upstream assemblies contain no colliding type names, so the merge is
+    lossless. Every ported file records its origin on its namespace line as
+    "//was previously: <original namespace>;".
+  * The target framework was narrowed from net461/net472/netstandard2.0 to
+    net10.0 alone, on the same terms as section 1. The three "#if NET40" blocks
+    in Util/TaskUtils.cs went with it: the live branch was kept and the
+    directives deleted. No other conditional compilation existed in this code.
+  * The StackExchange.Redis package reference was replaced by the ported client
+    in this same assembly.
+  * The Microsoft.Bcl.AsyncInterfaces package reference was dropped;
+    IAsyncDisposable is in the box on net10.0.
+  * The Microsoft.Extensions.Logging package reference was NOT carried over -
+    only Microsoft.Extensions.Logging.Abstractions, which this library already
+    took. Everything this code uses - ILogger<T>, ILoggerFactory and the Log*
+    extension methods - lives in the abstractions. The one exception was the
+    expression "new LoggerFactory()", used in two places as the do-nothing
+    fallback when a caller supplies no logger factory; it is now
+    NullLoggerFactory.Instance, the abstractions' no-op equivalent of a
+    provider-less LoggerFactory.
+  * Strong-name signing was removed; RedLock.snk was not ported. The upstream
+    package icon redlock-icon.png was not ported; the package ships the CodeBrix
+    icon. The upstream Directory.Build.props NoWarn of CS7035 was not carried
+    over either; it covered an assembly-version format this repository does not
+    use.
+  * The RedLockNet.Abstractions and RedLockNet.SERedis assemblies were merged
+    into CodeBrix.Redis.
+  * The two Lua resources' manifest names are pinned in CodeBrix.Redis.csproj
+    with LogicalName, as "CodeBrix.Redis.RedLock.Lua.Extend.lua" and
+    "CodeBrix.Redis.RedLock.Lua.Unlock.lua". Util/EmbeddedResourceLoader.cs
+    looks them up by name, and the assembly rename changes the name MSBuild
+    would otherwise derive; the pin makes the two agree by construction. That
+    loader now throws an InvalidOperationException naming the missing resource
+    instead of dereferencing a null stream.
+  * Two reads of IServer.IsSlave became IServer.IsReplica. Upstream RedLock.net
+    2.3.2 was written against StackExchange.Redis 2.x, where IsSlave was merely
+    obsolete; in 3.1.31 it is [Obsolete(error: true)] and does not compile. The
+    behaviour is identical, and the public RedLock property of the same name -
+    RedLockConfigurationChangedEventArgs.RedLockEndPointStatus.IsSlave - keeps
+    its name.
+  * Four uses of the implicit string -> RedisValue conversion became calls to
+    the public RedisValue(string) constructor, which is what that operator
+    does. The operator carries an [Experimental] gate in DEBUG builds of this
+    assembly (see section 1), and this library opts in to nothing beyond the
+    six identifiers on its one NoWarn line.
+  * The tests were converted from NUnit to xUnit v3 and to the CodeBrix test
+    conventions in the same pass: [TestFixture] dropped, [Test] -> [Fact],
+    [OneTimeSetUp] -> the constructor, every Assert.That(x, Is.*) -> the
+    SilverAssertions fluent form (Assert.Throws kept, since xUnit has its own),
+    the no-argument Assert.Fail() given a message, and snake_case method names.
+    Three tests upstream marks [Ignore] are skipped here with the suite's dynamic
+    idiom - a plain [Fact] whose first statement is Assert.Skip(reason) - because
+    a compile-time Skip trips the xUnit1004 analyzer and this repository carries no
+    suppressions. The JetBrains.Annotations [InstantHandle] attributes and using
+    were removed with a note at the site; that package is not taken here.
+    LoggerFactory.Create(b => b.AddSimpleConsole(...)) became
+    NullLoggerFactory.Instance, from Microsoft.Extensions.Logging.Abstractions,
+    rather than adding Microsoft.Extensions.Logging and .Logging.Console.
+  * THE QUORUM ENDPOINTS CHANGED, because the harness's servers are not upstream's.
+    Upstream's three "active" endpoints are localhost:6379/6380/6381, all writable
+    primaries it starts by hand. Here 6380 is the basic topology's read-only
+    REPLICA (it refuses SET .. NX) and 6381 is the PASSWORD-PROTECTED server, so
+    those three cannot form a Redlock quorum. The three are now the harness's three
+    independent writable primaries - the basic primary (6379), the failover primary
+    (6382) and the sentinel primary (7010) - taken from TestConfig and the harness
+    constants rather than from literals. The passworded and SSL endpoints moved to
+    the harness's secure (6381) and TLS (6384) ports for the same reason. Both SSL
+    tests stay skipped, for upstream's own stated reason: the harness generates its
+    certificate authority per run and it is in no trust store, so an endpoint with
+    Ssl = true still cannot validate it. The class also joins the suite's
+    non-parallel collection, because it shares the harness with FailoverTests and
+    SentinelFailoverTests, which deliberately demote two of those three primaries.
+  * Nullable reference types are enabled on this assembly and upstream
+    RedLock.net is not annotated, so the annotations were written at source
+    rather than suppressed. Nothing was forced with "!" and no type changed. On
+    the PUBLIC surface every addition says "may be null", which is what the
+    upstream code already accepted: the optional ILoggerFactory parameter of
+    both RedLockConfiguration constructors, of the
+    InternallyManagedRedLockConnectionProvider constructor and of the four
+    RedLockFactory.Create overloads; the RedLockRetryConfiguration parameter of
+    two of those overloads; RedLockConfiguration.LoggerFactory and
+    .RetryConfiguration; the IList<EndPoint> parameter of the RedLockEndPoint
+    constructor that already coalesced null to an empty list;
+    RedLockEndPoint.EndPoint - it returns the first of a possibly empty list -
+    .Password and .RedisKeyFormat; RedLockMultiplexer.RedisKeyFormat; and the
+    RedLockFactory.ConfigurationChanged event. Internally, the two
+    reference-typed properties of RedisConnection are "required", which every
+    construction site already satisfied. Two behaviours were made explicit at
+    the same time: assigning null to RedLockEndPoint.EndPoint now clears the
+    endpoint list rather than storing a null entry in it, and disposing an
+    InternallyManagedRedLockConnectionProvider that never created its
+    connections now returns instead of throwing.
+  * XML documentation comments were written for the whole RedLock public
+    surface. Upstream builds RedLock.net with documentation generation off and
+    documents most, but not all, of it; this assembly ships one documentation
+    file, so the missing summaries were written from the code. Every upstream
+    comment was kept verbatim, with the one exception in the next bullet.
+  * Two RedLockFactory.Create summaries read "existing StackExchange.Redis
+    ConnectionMultiplexers"; they now read "existing CodeBrix.Redis
+    ConnectionMultiplexers", which is the type they now take. The remaining
+    mentions of RedLock.net in comments and summaries were left as upstream
+    wrote them, and this code sends no library-identifying string to a server.
+
+License text:
+
+The MIT License (MIT)
+
+Copyright (c) 2018 Sam Cook
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+================================================================================
+4. redis-doc (documentation text only)
+================================================================================
+
+Project:      redis-doc - the Redis documentation
+Source:       https://github.com/redis/redis-doc
+              (formerly https://github.com/antirez/redis-doc, the address the
+              StackExchange.Redis LICENSE cites; since superseded by
+              https://github.com/redis/docs)
+Author:       Salvatore Sanfilippo and the Redis documentation contributors
+Copyright:    Copyright (C) 2009-2014 Salvatore Sanfilippo
+License:      Creative Commons Attribution-ShareAlike 4.0 International
+              (CC BY-SA 4.0)
+              https://creativecommons.org/licenses/by-sa/4.0/
+              https://creativecommons.org/licenses/by-sa/4.0/legalcode
+              https://github.com/redis/redis-doc/blob/master/COPYRIGHT
+
+The StackExchange.Redis LICENSE file records that the library's IntelliSense
+comments make use of text from the "redis-doc" library. The XML documentation
+comments on the Redis command surface - the IDatabase, IServer, ISubscriber
+and related members, several hundred of which also link to the corresponding
+https://redis.io/commands/ page - reproduce or closely paraphrase the command
+descriptions from that documentation. Those comments were carried into
+CodeBrix.Redis along with the code they document, so the same attribution
+applies here. The text is present in two places in this project: in the
+source files under src/CodeBrix.Redis, and in the CodeBrix.Redis.xml
+documentation file that ships in the NuGet package beside the assembly.
+
+Modifications: the documentation text was adapted by the StackExchange.Redis
+authors for use as IntelliSense - edited to describe the .NET API, reformatted
+as XML documentation comments, and with references to Redis reply values
+replaced by cross-references to the corresponding .NET members (for example,
+"the special value nil" became a reference to RedisValue.Null). CodeBrix.Redis
+carried that adapted text over unchanged.
+
+The copyright notice supplied with redis-doc reads, in full:
+
+    This documentation is Copyright (C) 2009-2014 Salvatore Sanfilippo and
+    is released under the following license:
+
+    Creative Commons Attribution-ShareAlike 4.0 International
+
+    You can find the full text of the license in the Creative Commons web site
+    at the following URL:
+
+    http://creativecommons.org/licenses/by-sa/4.0/
+
+The licensed material is offered as-is and without warranties of any kind, as
+set out in Section 5 of that license. This is documentation text only: no
+redis-doc code is incorporated, and no Redis server code is incorporated (see
+section 5).
+
+To the extent the documentation text in CodeBrix.Redis is derived from
+redis-doc, it is made available under the Creative Commons
+Attribution-ShareAlike 4.0 International license
+(https://creativecommons.org/licenses/by-sa/4.0/legalcode), and that license
+rather than the MIT license governs its re-use. The MIT license in the LICENSE
+file governs the code and all other documentation text.
+
+================================================================================
+5. Redis itself
+================================================================================
+
+Redis (https://redis.io/) is a separate server product and is independent of
+this client library. No Redis source code is incorporated into CodeBrix.Redis,
+and no Redis binaries are redistributed by this repository or its NuGet package.
+The container images the test harness pulls at test time come from their
+publishers and are not redistributed here.
+
+================================================================================
+A NOTE ON NUGET PACKAGE DEPENDENCIES
+================================================================================
+
+NuGet package dependencies are deliberately NOT listed in this file. They are
+not redistributed by this repository - they carry their own LICENSE and notices
+and are resolved by the consumer's own package restore. For the record,
+CodeBrix.Redis depends on exactly two, both published by Microsoft:
+Microsoft.Extensions.Logging.Abstractions and System.IO.Hashing.
+
+================================================================================
+
+END OF THIRD-PARTY SOFTWARE NOTICES AND INFORMATION

@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    An in-process Redis server built on CodeBrix.Redis, used by the test suites so that a large
+    part of the protocol surface can be exercised without a real server. Ported from the
+    upstream StackExchange.Redis repository's toys/StackExchange.Redis.Server project.
+
+    Upstream ships this as its own NuGet package. Here it is TEST SUPPORT ONLY and is never
+    packed: the drop-in scope of CodeBrix.Redis.MitLicenseForever covers StackExchange.Redis,
+    RESPite and RedLock.net, and no fourth package.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>CodeBrix.Redis.TestServer</AssemblyName>
+    <RootNamespace>CodeBrix.Redis.TestServer</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <!-- RedisRequest and RedisServer take function pointers to the generated ...Metadata.TryParseCI
+         methods, inside `unsafe` blocks. Upstream inherits AllowUnsafeBlocks from its repo-wide
+         Directory.Build.props; this repository has none, so every csproj states it for itself. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Nullable is deliberately NOT enabled here, unlike src/CodeBrix.Redis and the .Tests
+         projects. Upstream builds toys/StackExchange.Redis.Server with nullable reference
+         types OFF and its source carries no reference-type "?" annotations at all; turning
+         NRT on would raise thousands of CS86xx across ported code that could only be silenced
+         by annotating it - which is exactly the drift away from upstream that this port
+         avoids. GenerateDocumentationFile is likewise left off (upstream sets NoWarn CS1591
+         for the same reason), so CS1591 never fires on this project's public surface. -->
+    <!-- DELIBERATE, NARROW EXCEPTION to the family "no NoWarn anywhere" rule, approved by
+         Jeremy 2026-09-01 (plan decision 4). These six SERxxxx identifiers are NOT analyzer
+         defect rules: they are the diagnostic IDs of the [Experimental] API gates that the
+         library this server is built on declares (Respite/Shared/Experiments.cs). The server
+         names RespReader, RespScanState, RespFrameScanner, RespPrefix and AsciiHash directly.
+         C# raises an [Experimental] diagnostic as an ERROR, and the language's only sanctioned
+         opt-ins are NoWarn or marking each consuming type [Experimental] too. This line is that
+         opt-in acknowledgement - exactly what upstream's own Directory.Build.props carries -
+         and it suppresses no defect.
+
+         StringToRedisValue is the seventh identifier and belongs to the same opt-in, decided by
+         Jeremy on 2026-09-01 (plan section 12 item 6): the implicit string -> RedisValue operator
+         is marked [Experimental("StringToRedisValue")] in DEBUG builds ONLY, this server uses that
+         conversion throughout (every TypedRedisValue.Error/SimpleString/BulkString of a literal),
+         and upstream opts its own test side in exactly this way - tests/Directory.Build.targets
+         and toys/StackExchange.Redis.Server.csproj. TEST-SIDE PROJECTS ONLY; it is never added to
+         src/CodeBrix.Redis. Release builds are unaffected either way.
+
+         NOTHING ELSE MAY EVER BE ADDED TO THIS LINE. -->
+    <NoWarn>$(NoWarn);SER001;SER004;SER005;SER007;SER008;SER009;StringToRedisValue</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- MemoryCacheRedisServer keys its per-database stores off MemoryCache. Microsoft-published
+         and confined to that one file; swap to Microsoft.Extensions.Caching.Memory only if a
+         concrete problem appears. -->
+    <PackageReference Include="System.Runtime.Caching" Version="10.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CodeBrix.Redis\CodeBrix.Redis.csproj" />
+    <!-- The ASCII-hash source generator is LOAD-BEARING here, not a convenience: RedisServer.cs
+         declares HelloSubFieldsMetadata.TryParseCI as a `static partial` with no implementing
+         part and decorates the HelloSubFields enum with [AsciiHash], and the generator writes
+         the body. Without this reference the project fails with CS8795. Upstream gives every
+         project the same analyzer reference from its repo-wide Directory.Build.props; this
+         repository has none, so each csproj that needs it states it for itself. -->
+    <ProjectReference Include="..\..\src\CodeBrix.Redis.Build\CodeBrix.Redis.Build.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>
