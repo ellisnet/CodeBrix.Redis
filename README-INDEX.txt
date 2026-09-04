@@ -29,7 +29,14 @@ GENERAL
 -------
   README.md
       Human-facing overview shown on GitHub and nuget.org.
+  THIRD-PARTY-NOTICES.txt
+      What came from where, and under which licences.
   README-INDEX.txt
       This file.
+
+Readme files that arrived with ported test fixtures - for example
+tests/CodeBrix.Redis.Tests/Certificates/README.md - describe that fixture data
+and are carried verbatim. They are not authored here and are not part of this
+map.
 
 ================================================================================

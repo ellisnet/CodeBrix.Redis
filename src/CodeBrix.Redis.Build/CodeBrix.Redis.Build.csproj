@@ -33,7 +33,9 @@
     <!-- DELIBERATE, NARROW EXCEPTION to the family "no NoWarn anywhere" rule, approved by
          Jeremy 2026-09-01 (plan decision 4). These six SERxxxx identifiers are NOT analyzer
          defect rules: they are the diagnostic IDs of the [Experimental] API gates declared in
-         Respite/Shared/Experiments.cs, which this project compiles (AsciiHash.cs) and names.
+         Respite/Shared/Experiments.cs, which this project compiles (AsciiHash.cs) and names -
+         except SER001, which is carried for parity with upstream's own line and is not declared
+         here.
          C# raises an [Experimental] diagnostic as an ERROR, and the language's only sanctioned
          opt-ins are NoWarn or marking the consumer [Experimental] too. This line is that opt-in
          acknowledgement - exactly what upstream's own Directory.Build.props carries - and it

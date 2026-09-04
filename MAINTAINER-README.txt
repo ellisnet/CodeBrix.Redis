@@ -60,6 +60,21 @@ StackExchange.Redis, 221 for RESPite - are the checklist that verifies this.
 
 REPOSITORY LAYOUT
 =================
+    CodeBrix.Redis.slnx              Solution. Its Solution Items folder carries
+                                     .gitignore, AGENT-README.txt,
+                                     EXTRAS-README.txt, global.json,
+                                     icon-codebrix-128.png, LICENSE,
+                                     MAINTAINER-README.txt, README-INDEX.txt,
+                                     README.md and THIRD-PARTY-NOTICES.txt; its
+                                     Tests folder carries all five test
+                                     projects; the three src/ projects sit at
+                                     the solution root. Add a new root document
+                                     to Solution Items when you add one.
+
+    global.json                      Selects the Microsoft.Testing.Platform test
+                                     runner. Does NOT pin an SDK version. See
+                                     BUILDING and TESTING below.
+
     src/CodeBrix.Redis/              the library; the only packable project
       (root)                         the client surface: ConnectionMultiplexer,
                                      RedisDatabase, RedisValue, RedisKey,
@@ -164,10 +179,15 @@ Building the library produces the .nupkg automatically
 
 The build must be clean: zero warnings, zero errors. There is no WarningLevel
 override, no #pragma warning disable and no [SuppressMessage] attribute
-anywhere in this repository, and none may be added. There is exactly ONE NoWarn
-line, listing six SERxxxx [Experimental] gate identifiers - plus, on the test
-side only, StringToRedisValue - see deviation 4 below; it is closed, and nothing
-may ever be added to it.
+anywhere in the HAND-WRITTEN source of this repository, and none may be added.
+The one exception is not hand-written: AsciiHashGenerator emits
+"#pragma warning disable CS8981, SER004" into the code it generates, as
+upstream's generator does, so that the generated file compiles against the gate
+its own types are behind. THIRD-PARTY-NOTICES.txt records that too.
+
+There is exactly ONE NoWarn line, listing six SERxxxx [Experimental] gate
+identifiers - plus, on the test side only, StringToRedisValue - see deviation 4
+below; it is closed, and nothing may ever be added to it.
 GenerateDocumentationFile is on, so CS1591 fires for any undocumented public
 member - fix it by writing the comment, never by suppressing the warning. That
 applies to the RESPite-derived public types too: upstream builds RESPite with
@@ -181,7 +201,13 @@ TESTING
 
 global.json sits beside the .slnx and selects the Microsoft.Testing.Platform
 runner, which xunit.v3 4.x requires - without it the SDK reports that "testing
-with VSTest target is no longer supported".
+with VSTest target is no longer supported". It does NOT pin an SDK version, so
+the newest installed .NET 10 SDK is still the one used; selecting the runner is
+the whole of its job. Because the setting lives there rather than in a csproj it
+applies to every `dotnet test` run anywhere in the repository. Keep the file
+committed. coverlet.collector is not referenced by any test project - this
+family does not use it any more - so there is no coverage collector to
+configure.
 
 Note a known trap on the .NET 10.0.400 SDK: `dotnet test --solution` has been
 observed reporting zero tests ran across several CodeBrix repositories even
@@ -398,9 +424,14 @@ The second supplies the hashing used for cluster hash slots.
 
 Everything else the upstream projects reference existed only to serve target
 frameworks below net10.0 and is in the box on .NET 10: System.IO.Pipelines,
-Microsoft.Bcl.AsyncInterfaces, System.Threading.Channels, System.IO.Compression,
-System.Buffers, System.Memory, and System.Runtime.InteropServices.
-RuntimeInformation. Do not reinstate any of them.
+Microsoft.Bcl.AsyncInterfaces, System.Threading.Channels, System.IO.Compression
+and System.Runtime.InteropServices.RuntimeInformation. Do not reinstate any of
+them. That list is the one THIRD-PARTY-NOTICES.txt records package reference by
+package reference, per upstream project; it is the authority, and this sentence
+must be kept identical to it. (Several down-level POLYFILL types the ported
+source carried - in the System.Buffers, System.Runtime.CompilerServices,
+System.Text and System.Diagnostics.CodeAnalysis namespaces - went the same way
+for the same reason, but they were source, never package references.)
 
 The rule for anything new: prefer an in-box API, then a CodeBrix.* package, then
 a Microsoft-published package. A non-Microsoft, non-CodeBrix package reference
@@ -450,11 +481,14 @@ THE DEVIATIONS FROM FAMILY CONVENTION, AND WHY
 Four, all deliberate, all approved by Jeremy on 2026-09-01. If you are auditing
 this repository against the family rules, these are the expected findings:
 
-1. Nullable reference types are ENABLED on src/CodeBrix.Redis and on the test
-   projects, where the family default is off. The upstream is annotated
-   throughout and - the point - its PUBLIC signatures are annotated. Stripping
-   the annotations across roughly 83,000 lines would change what a consumer
-   migrating off StackExchange.Redis sees at compile time, which is precisely
+1. Nullable reference types are ENABLED on all three src/ projects - the
+   library, CodeBrix.Redis.Build and CodeBrix.Redis.CodeFixes - and on the three
+   test projects that carry it (CodeBrix.Redis.Tests, .Respite.Tests and
+   .Build.Tests; not .TestServer, not .TestHarness), where the family default is
+   off. The upstream is annotated throughout and - the point - its PUBLIC
+   signatures are annotated. Stripping the annotations across roughly 83,000
+   lines would change what a consumer migrating off StackExchange.Redis sees at
+   compile time, which is precisely
    what this package exists to preserve. Same grounds as the standing exception
    in CodeBrix.Platform.OpenGL. This does not generalize: a CodeBrix library
    that is not a port of NRT-annotated upstream code still has NRT off.
@@ -523,7 +557,9 @@ two values are named by their numeric constants beside a comment saying which is
 which.
 
 Apart from that one NoWarn line there is no warning
-suppression anywhere - no #pragma, no [SuppressMessage], no ruleset -
+suppression in hand-written source anywhere - no #pragma, no [SuppressMessage],
+no ruleset; the ASCII-hash generator emits one #pragma into its generated code,
+as upstream's does, and that is the whole of it -
 GenerateDocumentationFile stays on and CS1591 is fixed at source, unlike the
 CodeBrix.AssemblyTools and CodeBrix.Platform.OpenGL exceptions. The public
 surface here is a few thousand members, not tens of thousands, and upstream

@@ -8,8 +8,24 @@ CodeBrix.Redis.MitLicenseForever, built from src/CodeBrix.Redis (with the two
 analyzer projects packed inside it). Everything described below ships with the
 repository and never with the package.
 
-There are no sample applications here. The extras are test support: two
-libraries that exist so the test suites can run against something real.
+There are no sample applications here. The non-package content is the test side
+of the repository: three test SUITES, plus two libraries that exist so those
+suites can run against something real.
+
+
+THE TEST SUITES
+===============
+    tests/CodeBrix.Redis.Tests/          the client and the command surface
+    tests/CodeBrix.Redis.Respite.Tests/  the RESP protocol layer
+    tests/CodeBrix.Redis.Build.Tests/    the generators and the analyzers
+
+None of the three is packed, and none of them belongs to the package's public
+surface. They are, however, the most complete worked examples of the library in
+this repository, which is why AGENT-README.txt points a consumer at them.
+
+How to run them, which tier needs Docker, and what each run is expected to
+report are in MAINTAINER-README.txt, TESTING; that is the one place those
+numbers live, so they are not repeated here.
 
 
 CodeBrix.Redis.TestServer

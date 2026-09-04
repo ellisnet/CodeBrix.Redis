@@ -22,9 +22,9 @@ It is a PORT, and that is the most useful thing to know about it. It replaces
 three MIT-licensed packages, and its types, members, signatures, nullability
 annotations and behaviour are theirs:
 
-    StackExchange.Redis 3.1.31   ->  namespace CodeBrix.Redis
-    RESPite 3.1.31               ->  namespace CodeBrix.Redis.Respite
-    RedLock.net 2.3.2            ->  namespace CodeBrix.Redis.RedLock
+    StackExchange.Redis   ->  namespace CodeBrix.Redis
+    RESPite               ->  namespace CodeBrix.Redis.Respite
+    RedLock.net           ->  namespace CodeBrix.Redis.RedLock
 
 The practical consequence for you: everything you know about StackExchange.Redis
 applies here unchanged, and so does everything written about it anywhere else.
@@ -67,12 +67,17 @@ merely internal plumbing - see ConfigurationOptions.LoggerFactory. If your
 application already uses Microsoft.Extensions.Logging, your existing
 ILoggerFactory is the one to hand over.
 
-The package also carries Roslyn analyzers under analyzers/dotnet/cs, which
-install themselves when you reference the package. They report the same SERxxxx
-diagnostics the upstream StackExchange.Redis package reports, with code fixes in
-the IDE. They are compile-time only and nothing about them reaches your output.
-See THE SHIPPED ANALYZERS for the rules and for the one MSBuild property that
-tunes them.
+The package also carries a Roslyn payload under analyzers/dotnet/cs, which
+installs itself when you reference the package: two analyzers - the transaction
+analyzer and the queued-result analyzer - and two incremental source generators.
+The analyzers report the same SERxxxx diagnostics the upstream
+StackExchange.Redis package reports, with code fixes in the IDE. Of the two
+generators, the auto-database generator checks the assembly name and does
+nothing at all outside this library, while the ASCII-hash generator will emit
+source in your compilation if you use the [AsciiHash] attribute - which is
+behind an opt-in gate, so ordinary client code never meets it. All four are
+compile-time only and nothing about them reaches your output. See THE SHIPPED
+ANALYZERS for the rules and for the one MSBuild property that tunes them.
 
 Requires a Redis server to talk to. The client negotiates capabilities with
 each server it connects to and exposes what it found as RedisFeatures, reachable
@@ -405,9 +410,11 @@ and the sentinel commands (SentinelGetMasterAddressByName,
 SentinelGetReplicaAddresses, SentinelFailover, and their Async forms).
 IServer.Features is the negotiated capability set for that server.
 
-Two of the replication members exist only in their Async form for callers:
-ReplicaOf and MakePrimary are [Obsolete] as errors, exactly as upstream marks
-them, so write ReplicaOfAsync and MakePrimaryAsync.
+Call the replication members in their Async form. The synchronous ReplicaOf and
+MakeMaster are [Obsolete] as errors, exactly as upstream marks them, so naming
+either one fails the build; write ReplicaOfAsync and MakePrimaryAsync instead.
+SlaveOf and SlaveOfAsync are obsolete as errors on the same terms, from the move
+to "replica" terminology - ReplicaOfAsync is what replaces both of them.
 
 Destructive members require AllowAdmin=true in the configuration. That is a
 deliberate speed bump; leave it off in application configuration and set it only
@@ -492,7 +499,23 @@ THE ERROR MODEL
     RedisCommandException         the command is not valid - wrong argument
                                   count, disabled in the CommandMap, or needs a
                                   server feature that is not present.
-    RedisException                the base of all of the above.
+    RedisException                the base of RedisConnectionException and
+                                  RedisServerException, and of those two ONLY.
+
+Read that last line carefully before writing a catch clause. The hierarchy is
+upstream's and it is not what the names suggest: RedisCommandException derives
+straight from Exception, and RedisTimeoutException derives from
+TimeoutException, so "catch (RedisException)" catches neither of them. To
+handle all four, catch the specific types you mean:
+
+    try
+    {
+        await db.StringSetAsync("k", "v");
+    }
+    catch (RedisTimeoutException) { /* client or server was too slow */ }
+    catch (RedisConnectionException) { /* no usable connection */ }
+    catch (RedisServerException) { /* the server replied with an error */ }
+    catch (RedisCommandException) { /* the command itself was not valid */ }
 
 A RedisTimeoutException message is a diagnostic report, not a sentence. It names
 the inbound and outbound queue sizes, the busy/min worker and IO thread counts,
@@ -526,6 +549,10 @@ The rules in the 300 range are the ones a consumer meets:
             default value
     SER307  blocking on a redis call instead of awaiting it
     SER308  blocking on a task through the library's Wait helpers
+    SER350  the generated code needs a newer C# language version than the
+            project is compiling with, so nothing was generated - raise
+            <LangVersion>. Reported by the ASCII-hash generator, so you meet it
+            only if you have opted in to [AsciiHash] and used it
 
 SER301 and its relatives depend on the server you will run against, which an
 analyzer cannot see, so they are reported by default. Declare the floor and you
@@ -539,6 +566,13 @@ The property name is the upstream one, so an existing setting keeps working
 after the swap. The .editorconfig / .globalconfig spelling is
 redis.min_server_version, and it takes precedence. Major.minor is what is read.
 
+One thing to know about your tooling: this Roslyn payload is compiled against
+the compiler of a current .NET 10 SDK, and an analyzer cannot load in a compiler
+or IDE older than the one it was built against. Build with a current .NET 10
+SDK. On older tooling the analyzer simply loads nothing and its diagnostics are
+silently absent - the build still succeeds, so nothing tells you the checks
+stopped running.
+
 
 THE EXPERIMENTAL API GATES
 --------------------------
@@ -551,7 +585,12 @@ point of the attribute, not a defect. The gates, and what is behind each:
             RespPrefix, RespException, the buffers, AsciiHash
     SER005  TestHarness, the unit-testing support type
     SER007  the whole CodeBrix.Redis.Availability namespace - connection groups,
-            health checks, circuit breakers
+            health checks, circuit breakers - plus the retry and
+            circuit-breaker members that sit outside it: the RedisErrorKind
+            enum, ConfigurationOptions.CircuitBreaker and .RetryPolicy, the
+            eight CommandFlags.CommandRetry* values,
+            ConnectionFailureType.CircuitBreaker, and
+            IDatabaseAsync.CreateTransaction
     SER008  HashImport
     SER009  the transport surface - TlsOptions,
             CodeBrix.Redis.Respite.Transports
@@ -570,6 +609,11 @@ exactly as you would with the upstream package:
 
 or mark the consuming member [Experimental] itself. An identifier that is not
 listed stays gated, which is what you want: opt in to the gate you meant.
+
+SER001 appears on that line for parity with the upstream project's own opt-in,
+and this package declares no gate under it - the gates it actually declares are
+the five listed above. Carrying it costs nothing and lets a project that already
+had upstream's line paste it across unchanged.
 
 
 COMPLETE EXAMPLES
@@ -866,8 +910,10 @@ WHAT THIS PACKAGE DOES NOT DO
     The handshake reports lib-name=CodeBrix.Redis, and a connection you did not
     name yourself gets "<machine name>(CodeBrix.Redis-v<version>)" - so that is
     what CLIENT LIST and CLIENT INFO show. A client should not misreport its
-    identity. Everything below that is byte-identical to upstream: command names,
-    argument order, RESP framing and the lib-ver value.
+    identity. lib-ver likewise reports THIS package's own version, read from its
+    assembly file version, rather than the version of anything it replaces.
+    Everything below that is byte-identical to upstream: command names, argument
+    order and RESP framing.
 
 
 WORKING EXAMPLES ON GITHUB

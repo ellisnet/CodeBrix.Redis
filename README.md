@@ -3,31 +3,35 @@
 A high-performance, fully managed **Redis client** for .NET, incorporating both synchronous and
 asynchronous usage. One assembly covers the whole stack: the RESP protocol reader and writer, the
 connection multiplexer and its cluster / sentinel / replica awareness, the full command surface,
-and the Redlock distributed-lock algorithm.
+and the Redlock distributed-lock algorithm. CodeBrix.Redis is provided as a .NET 10 library and
+associated `CodeBrix.Redis.MitLicenseForever` NuGet package.
 
-Published on NuGet as **`CodeBrix.Redis.MitLicenseForever`** — MIT licensed, forever.
-
-CodeBrix.Redis is a port of three MIT-licensed libraries into a single .NET 10 package:
-
-| Upstream package | Version ported | Becomes |
-|---|---|---|
-| [StackExchange.Redis](https://github.com/StackExchange/StackExchange.Redis) | 3.1.31 | `CodeBrix.Redis` |
-| [RESPite](https://github.com/StackExchange/StackExchange.Redis) | 3.1.31 | `CodeBrix.Redis.Respite` |
-| [RedLock.net](https://github.com/samcook/RedLock.net) | 2.3.2 | `CodeBrix.Redis.RedLock` |
-
-It is a drop-in replacement for all three: the types, members, and behaviour are those of the
-upstream libraries. The one change a consumer must make is to the `using` directives — the
-namespaces are the `CodeBrix.Redis.*` names above. Full attribution and the record of every
-modification made during the port are in `THIRD-PARTY-NOTICES.txt`.
-
-CodeBrix.Redis takes exactly two NuGet dependencies, both published by Microsoft:
-`Microsoft.Extensions.Logging.Abstractions` (its `ILoggerFactory` is part of the public surface)
-and `System.IO.Hashing`.
-
-CodeBrix.Redis supports applications and assemblies that target Microsoft .NET version 10.0 and
-later. Microsoft .NET version 10.0 is a Long-Term Supported (LTS) version of .NET, and was
-released on Nov 11, 2025; and will be actively supported by Microsoft until Nov 14, 2028.
+CodeBrix.Redis supports applications and assemblies that target Microsoft .NET version 10.0 and later.
+Microsoft .NET version 10.0 is a Long-Term Supported (LTS) version of .NET, and was released on Nov 11, 2025; and will be actively supported by Microsoft until Nov 14, 2028.
 Please update your C#/.NET code and projects to the latest LTS version of Microsoft .NET.
+
+## Installation
+
+```
+dotnet add package CodeBrix.Redis.MitLicenseForever
+```
+
+Note that the NuGet package ID and the namespace are different - there is no package named plain `CodeBrix.Redis`:
+
+* NuGet package ID: `CodeBrix.Redis.MitLicenseForever`
+* Assembly and primary namespace: `CodeBrix.Redis` - i.e. `using CodeBrix.Redis;`
+
+XML documentation (IntelliSense) ships alongside the assembly.
+
+The package pulls in exactly two dependencies, both published by Microsoft; no version pinning is
+needed in the consuming project:
+
+* `Microsoft.Extensions.Logging.Abstractions` - its `ILoggerFactory` is part of the public surface,
+  through `ConfigurationOptions.LoggerFactory`
+* `System.IO.Hashing` - the hashing behind cluster hash-slot routing
+
+Roslyn analyzers, and their code fixes for the IDE, install themselves along with the package. They
+are compile-time only, and nothing about them reaches your output.
 
 ## CodeBrix.Redis supports:
 
@@ -47,12 +51,12 @@ Please update your C#/.NET code and projects to the latest LTS version of Micros
   one Redis database without colliding
 * **Profiling and diagnostics** — per-command profiling sessions, connection counters, storm logs,
   and an `ILoggerFactory` hook for connection logging
-* **A low-level RESP layer** (`CodeBrix.Redis.Respite`) usable on its own, for talking RESP to
-  something that is not Redis
-* **The Redlock distributed-lock algorithm** (`CodeBrix.Redis.RedLock`) across independent Redis
-  instances, with lock extension and expiry
-* **Roslyn analyzers shipped in the package** — the same compile-time diagnostics the upstream
-  package provides, including the transaction and queued-result analyzers, with code fixes
+* **A low-level RESP layer** (namespace `CodeBrix.Redis.Respite`) usable on its own, for talking
+  RESP to something that is not Redis
+* **The Redlock distributed-lock algorithm** (namespace `CodeBrix.Redis.RedLock`) across
+  independent Redis instances, with lock extension and expiry
+* **Roslyn analyzers shipped in the package** — compile-time transaction and queued-result
+  diagnostics, with code fixes in the IDE
 
 ## Sample Code
 
@@ -91,10 +95,17 @@ if (redLock.IsAcquired)
 }
 ```
 
+## Documentation
+
+The NuGet package includes `AGENT-README.txt`, a complete API reference and usage guide written for AI coding agents - point your agent at that file when it is writing code against this library.
+
+Additional sample code and usage examples are available in the `CodeBrix.Redis.Tests` project:
+https://github.com/ellisnet/CodeBrix.Redis/tree/main/tests/CodeBrix.Redis.Tests
+
 ## License
 
-The project is licensed under the MIT License. see: https://en.wikipedia.org/wiki/MIT_License
+CodeBrix.Redis is licensed under the MIT License - see the
+[LICENSE](https://github.com/ellisnet/CodeBrix.Redis/blob/main/LICENSE) file.
 
-CodeBrix.Redis is derived from StackExchange.Redis (Copyright (c) 2014 Stack Exchange), RESPite
-(Copyright (c) 2025 Marc Gravell), and RedLock.net (Copyright (c) 2018 Sam Cook), each MIT
-licensed. See `THIRD-PARTY-NOTICES.txt`.
+For licensing and provenance information about the open source code included in
+this package, see [THIRD-PARTY-NOTICES.txt](https://github.com/ellisnet/CodeBrix.Redis/blob/main/THIRD-PARTY-NOTICES.txt).

@@ -18,4 +18,8 @@ SER301  | Usage    | Warning  | TransactionAnalyzer: transaction may be replacea
 SER302  | Usage    | Warning  | TransactionAnalyzer: condition may be redundant; the queued command already reports whether it acted
 SER303  | Usage    | Warning  | TransactionAnalyzer: two queued operations may be a single compound command
 SER304  | Usage    | Warning  | TransactionAnalyzer: repeated queued operations may suit the variadic overload
+SER305  | Usage    | Error    | QueuedResultAnalyzer: waiting for a command queued on a transaction or batch, before Execute[Async]() sends it, never completes
+SER306  | Usage    | Warning  | QueuedResultAnalyzer: waiting for a fire-and-forget result reads the default value rather than the server's answer
+SER307  | Usage    | Warning  | QueuedResultAnalyzer: blocking on a redis call instead of awaiting it, which ties up a thread-pool thread while the reply needs one of its own
+SER308  | Usage    | Warning  | QueuedResultAnalyzer: calling the library's own Wait/WaitAll/TryWait helpers, which block the calling thread
 SER350  | Build    | Warning  | AsciiHashGenerator: generated code requires a newer C# language version, so nothing was generated

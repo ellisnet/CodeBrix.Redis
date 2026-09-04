@@ -19,7 +19,8 @@
     <!-- DELIBERATE, NARROW EXCEPTION to the family "no NoWarn anywhere" rule, approved by
          Jeremy 2026-09-01 (plan decision 4). These six SERxxxx identifiers are NOT analyzer
          defect rules: they are the diagnostic IDs of the [Experimental] API gates declared in
-         this very assembly (Respite/Shared/Experiments.cs). C# raises an [Experimental]
+         this very assembly (Respite/Shared/Experiments.cs) - except SER001, which is carried
+         for parity with upstream's own line and is not declared here. C# raises an [Experimental]
          diagnostic as an ERROR, and the language's only sanctioned opt-ins are NoWarn or
          marking the consumer [Experimental] too; the latter cascades through 97 client-core
          files and would reach public types, changing the drop-in surface. This line is that
@@ -77,7 +78,7 @@
     <Product>CodeBrix.Redis</Product>
     <Title>CodeBrix.Redis</Title>
     <Authors>Jeremy Ellis</Authors>
-    <Description>A high-performance, fully managed Redis client for .NET, incorporating both synchronous and asynchronous usage. Connection multiplexing across a cluster, sentinel and replica topologies, the full command surface including streams and vector sets, RESP2 and RESP3, pub/sub, transactions, batches and Lua scripting, a low-level RESP protocol layer, and the Redlock distributed-lock algorithm. Ported from StackExchange.Redis, RESPite and RedLock.net.</Description>
+    <Description>A high-performance, fully managed Redis client for .NET, incorporating both synchronous and asynchronous usage. Connection multiplexing across a cluster, sentinel and replica topologies, the full command surface including streams and vector sets, RESP2 and RESP3, pub/sub, transactions, batches and Lua scripting, a low-level RESP protocol layer, and the Redlock distributed-lock algorithm. Roslyn analyzers and their IDE code fixes ship inside the package.</Description>
     <Copyright>Copyright (c) 2014 - 2026 Stack Exchange, Inc. Copyright (c) 2025 - 2026 Marc Gravell. Copyright (c) 2018 Sam Cook. Copyright (c) 2026 Jeremy Ellis and contributors</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/ellisnet/CodeBrix.Redis</PackageProjectUrl>
