@@ -79,7 +79,7 @@
     <Title>CodeBrix.Redis</Title>
     <Authors>Jeremy Ellis</Authors>
     <Description>A high-performance, fully managed Redis client for .NET, incorporating both synchronous and asynchronous usage. Connection multiplexing across a cluster, sentinel and replica topologies, the full command surface including streams and vector sets, RESP2 and RESP3, pub/sub, transactions, batches and Lua scripting, a low-level RESP protocol layer, and the Redlock distributed-lock algorithm. Roslyn analyzers and their IDE code fixes ship inside the package.</Description>
-    <Copyright>Copyright (c) 2014 - 2026 Stack Exchange, Inc. Copyright (c) 2025 - 2026 Marc Gravell. Copyright (c) 2018 Sam Cook. Copyright (c) 2026 Jeremy Ellis and contributors</Copyright>
+    <Copyright>Copyright (c) 2026 Jeremy Ellis and contributors</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/ellisnet/CodeBrix.Redis</PackageProjectUrl>
     <RepositoryUrl>https://github.com/ellisnet/CodeBrix.Redis</RepositoryUrl>
