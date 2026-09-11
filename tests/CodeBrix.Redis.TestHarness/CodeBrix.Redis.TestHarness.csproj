@@ -31,7 +31,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CodeBrix.Docker.MitLicenseForever" Version="1.0.244.840" />
+    <PackageReference Include="CodeBrix.Docker.MitLicenseForever" Version="1.0.254.1406" />
   </ItemGroup>
 
   <ItemGroup>
