@@ -96,17 +96,16 @@
     <!-- ILoggerFactory is part of the public surface (ConfigurationOptions.LoggerFactory and
          DefaultOptionsProvider.LoggerFactory), so this reference is required for drop-in
          source compatibility, not merely for internal logging. -->
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
     <!-- CRC-16/XxHash for cluster hash slots and key hashing. -->
-    <PackageReference Include="System.IO.Hashing" Version="10.0.11" />
+    <PackageReference Include="System.IO.Hashing" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- The generators in this project emit source this assembly cannot compile without
          (see MAINTAINER-README.txt). ReferenceOutputAssembly=false: it is a build-time tool
          here, not a runtime dependency. -->
-    <ProjectReference Include="..\CodeBrix.Redis.Build\CodeBrix.Redis.Build.csproj"
-                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\CodeBrix.Redis.Build\CodeBrix.Redis.Build.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -147,24 +146,18 @@
     invisible.
   -->
   <Target Name="_ResolveCodeBrixRedisAnalyzerForPackaging" BeforeTargets="_GetPackageFiles">
-    <MSBuild Projects="..\CodeBrix.Redis.Build\CodeBrix.Redis.Build.csproj"
-             Targets="GetTargetPath"
-             Properties="Configuration=$(Configuration);TargetFramework=netstandard2.0">
+    <MSBuild Projects="..\CodeBrix.Redis.Build\CodeBrix.Redis.Build.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration);TargetFramework=netstandard2.0">
       <Output TaskParameter="TargetOutputs" ItemName="_CodeBrixRedisAnalyzerAssembly" />
     </MSBuild>
 
     <!-- appended to the same item, so the checks and the pack below cover both without being
          written twice -->
-    <MSBuild Projects="..\CodeBrix.Redis.CodeFixes\CodeBrix.Redis.CodeFixes.csproj"
-             Targets="GetTargetPath"
-             Properties="Configuration=$(Configuration);TargetFramework=netstandard2.0">
+    <MSBuild Projects="..\CodeBrix.Redis.CodeFixes\CodeBrix.Redis.CodeFixes.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration);TargetFramework=netstandard2.0">
       <Output TaskParameter="TargetOutputs" ItemName="_CodeBrixRedisAnalyzerAssembly" />
     </MSBuild>
 
-    <Error Condition="'@(_CodeBrixRedisAnalyzerAssembly)' == ''"
-           Text="Could not resolve the CodeBrix.Redis.Build analyzer output; the package would ship without its analyzer." />
-    <Error Condition="!Exists('%(_CodeBrixRedisAnalyzerAssembly.FullPath)')"
-           Text="The CodeBrix.Redis.Build analyzer has not been built (%(_CodeBrixRedisAnalyzerAssembly.FullPath)); build it before packing." />
+    <Error Condition="'@(_CodeBrixRedisAnalyzerAssembly)' == ''" Text="Could not resolve the CodeBrix.Redis.Build analyzer output; the package would ship without its analyzer." />
+    <Error Condition="!Exists('%(_CodeBrixRedisAnalyzerAssembly.FullPath)')" Text="The CodeBrix.Redis.Build analyzer has not been built (%(_CodeBrixRedisAnalyzerAssembly.FullPath)); build it before packing." />
 
     <ItemGroup>
       <!-- no trailing separator: these items are absolute paths, and NuGet appends one itself -

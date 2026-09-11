@@ -24,13 +24,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="xunit.v3" Version="4.0.0" />
-    <PackageReference Include="SilverAssertions.ApacheLicenseForever" Version="1.0.237.1200" />
+    <PackageReference Include="SilverAssertions.ApacheLicenseForever" Version="1.0.248.1071" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Analyzer.Testing" Version="1.1.4" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.CodeFix.Testing" Version="1.1.4" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.9.0" />
@@ -39,10 +39,8 @@
   <ItemGroup>
     <!-- Referenced as libraries (not as analyzers) so the tests can instantiate the analyzers and
          code fixes directly. -->
-    <ProjectReference Include="..\..\src\CodeBrix.Redis.Build\CodeBrix.Redis.Build.csproj"
-                      OutputItemType="" ReferenceOutputAssembly="true" />
-    <ProjectReference Include="..\..\src\CodeBrix.Redis.CodeFixes\CodeBrix.Redis.CodeFixes.csproj"
-                      OutputItemType="" ReferenceOutputAssembly="true" />
+    <ProjectReference Include="..\..\src\CodeBrix.Redis.Build\CodeBrix.Redis.Build.csproj" OutputItemType="" ReferenceOutputAssembly="true" />
+    <ProjectReference Include="..\..\src\CodeBrix.Redis.CodeFixes\CodeBrix.Redis.CodeFixes.csproj" OutputItemType="" ReferenceOutputAssembly="true" />
     <!-- The analyzers resolve CodeBrix.Redis types by metadata name, so the test compilation must
          actually reference the library; without this every test would pass by finding nothing. -->
     <ProjectReference Include="..\..\src\CodeBrix.Redis\CodeBrix.Redis.csproj" />

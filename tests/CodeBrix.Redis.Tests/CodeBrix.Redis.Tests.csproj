@@ -65,15 +65,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="xunit.v3" Version="4.0.0" />
-    <PackageReference Include="SilverAssertions.ApacheLicenseForever" Version="1.0.237.1200" />
+    <PackageReference Include="SilverAssertions.ApacheLicenseForever" Version="1.0.248.1071" />
     <!-- Replaces the upstream suite's NSubstitute usage (6 files); see MAINTAINER-README.txt. -->
-    <PackageReference Include="CodeBrix.TestMocks.ApacheLicenseForever" Version="1.0.237.1192" />
+    <PackageReference Include="CodeBrix.TestMocks.ApacheLicenseForever" Version="1.0.248.1105" />
   </ItemGroup>
 
   <ItemGroup>
@@ -90,8 +90,7 @@
          Without this reference the project fails with CS0117. Upstream gives every project the
          same analyzer reference from its repo-wide Directory.Build.props; this repository has
          none, so each csproj that needs it states it for itself. -->
-    <ProjectReference Include="..\..\src\CodeBrix.Redis.Build\CodeBrix.Redis.Build.csproj"
-                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\src\CodeBrix.Redis.Build\CodeBrix.Redis.Build.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>
