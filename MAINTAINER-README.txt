@@ -328,6 +328,22 @@ None of them is a failure in disguise, and only ONE was added by this port.
         core. The scan is left intact in the test so it can be re-enabled if the
         premise ever returns.
 
+ON macOS the tier-3 count is 120 skipped, not 119, and Release tier 1/2 is 2,597:
+FormatTests.parse_abstract_unix_domain_socket_end_point skips there ("the abstract
+socket namespace is Linux-only"), and SSLTests.connect_ssl_client_authentication_options
+skips its Ssl3 | Tls12 | Tls13 row ("macOS rejects an SslProtocols set that skips
+intermediate versions") - Apple's TLS stack validates the set as a whole before the
+handshake, where Linux and Windows silently drop the obsolete member. The TLS 1.3
+rows pass on macOS ONLY because tests/CodeBrix.Redis.Tests/CodeBrix.Redis.Tests.csproj
+sets the System.Net.Security.UseNetworkFramework runtime switch: .NET's default
+macOS backend (SecureTransport) has no TLS 1.3 and fails those rows with
+PlatformNotSupportedException. The switch is read only by the macOS build of
+System.Net.Security; it changes nothing on Linux or Windows. A consumer who needs
+TLS 1.3 to a Redis server FROM macOS must opt in the same way (that switch, or
+DOTNET_SYSTEM_NET_SECURITY_USENETWORKFRAMEWORK=1); that is a .NET platform
+limitation the library cannot lift. Verified 2026-09-15 on an Intel Mac mini
+(macOS 15.8, .NET 10.0.12, Docker Desktop 4.91).
+
 A tier-1/2 run skips 2,596 instead: the same list, plus the 2,470 container-tier
 skips, and minus the tests those cover.
 

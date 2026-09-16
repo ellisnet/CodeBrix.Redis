@@ -192,6 +192,11 @@ public class SSLTests(ITestOutputHelper output, SSLTests.SSLServerFixture fixtur
         //cipher suites cannot run there; the same OperatingSystem check guards the construction below,
         //which is what CA1416 asks for (the analyzer cannot see this one from inside the lambda).
         Assert.SkipWhen(tlsCipherSuites.Length > 0 && OperatingSystem.IsWindows(), "CipherSuitesPolicy is not supported on Windows");
+        //macOS validates the SslProtocols set as a whole and rejects one that names SSL 3 and TLS 1.2 without
+        //TLS 1.0 and 1.1 in between ("skips intermediate versions"), before any handshake. Linux and Windows
+        //simply ignore the obsolete member, which is what this row's expectSuccess = true relies on.
+        Assert.SkipWhen(OperatingSystem.IsMacOS() && protocols.HasFlag(Ssl3Value) && protocols.HasFlag(SslProtocols.Tls12),
+            "macOS rejects an SslProtocols set that skips intermediate versions");
 
         try
         {

@@ -64,6 +64,20 @@
     <None Update="Certificates\*.pem" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!--
+    macOS ONLY, ignored everywhere else: .NET's default TLS backend on macOS (SecureTransport) has
+    no TLS 1.3, so every SSLTests row that names SslProtocols.Tls13 fails there with
+    PlatformNotSupportedException. Since .NET 10 the runtime carries a Network.framework backend
+    that does speak TLS 1.3, gated behind this AppContext switch (or the
+    DOTNET_SYSTEM_NET_SECURITY_USENETWORKFRAMEWORK=1 environment variable). The switch is read
+    only by the macOS build of System.Net.Security; Linux and Windows never look at it. Verified
+    2026-09-15 on an Intel Mac mini (macOS 15.8, .NET 10.0.12): tier 3 goes from 3 failures to the
+    single "skips intermediate versions" row, which SSLTests skips on macOS by name.
+  -->
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.Net.Security.UseNetworkFramework" Value="true" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
