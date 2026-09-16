@@ -285,6 +285,38 @@ TIER 3 - with Docker. Set the variable for the run:
     for a run that was killed part way. After a normal run "docker ps -a" shows
     no container with that prefix.
 
+    ON macOS, TWO THINGS OUTSIDE THIS REPOSITORY MUST BE TRUE before the fixture
+    can start, and each one fails the ENTIRE tier in seconds (every test reports
+    "Assembly fixture type ... threw in InitializeAsync"):
+
+      - Port 7000 must be free. macOS AirPlay Receiver (the ControlCenter process)
+        listens on TCP 7000, and the cluster topology publishes 7000-7005, fixed
+        because the ported TestConfig names them. The symptom is "ports are not
+        available: ... 0.0.0.0:7000: bind: address already in use". Turn it off
+        under System Settings > General > AirDrop & Handoff > AirPlay Receiver;
+        `lsof -nP -iTCP:7000 -sTCP:LISTEN` shows who holds it. The other fixed
+        ports (6379-6384, 7010, 7011, 7015, 8001, 26379-26381) are not claimed by
+        macOS.
+      - The Docker socket must be found. Docker Desktop for Mac does not create
+        /var/run/docker.sock unless "Allow the default Docker socket to be used"
+        is on; its socket is ~/.docker/run/docker.sock. CodeBrix.Docker falls
+        back to that path from its 2026-09-15 change onward, but the harness
+        consumes CodeBrix.Docker as a NuGet package (see
+        tests/CodeBrix.Redis.TestHarness/CodeBrix.Redis.TestHarness.csproj), so
+        until the referenced version carries that change, either enable the
+        setting or set DOCKER_HOST=unix://$HOME/.docker/run/docker.sock for the
+        run. The symptom is "Could not connect to the Docker daemon on socket
+        '/var/run/docker.sock'".
+
+    Two more macOS-only observations, both fixed in the tests on 2026-09-15 and
+    recorded here so a recurrence is recognised: Docker Desktop's Linux VM clock
+    ran 1.5 ms behind the Mac clock on an Apple Silicon Mac mini, which pushed the
+    absolute-expiry TTLs in HashFieldTests 1-2 ms over their exact upper bound
+    (the assertions now carry one second of slack); and VectorSetIntegrationTests.
+    vector_set_info asserted a non-zero vset-uid, but Redis numbers vector sets
+    from zero, so the first one created on fresh containers failed it (it now
+    asserts >= 0). Neither was Apple Silicon-specific; both suites pass on arm64.
+
     The xunit.v3 runner switches worth knowing when chasing one test:
     -class <full.Name>, -method <full.Name.method>, -parallel none, -maxthreads N,
     -stoponfail, -xml <file>.

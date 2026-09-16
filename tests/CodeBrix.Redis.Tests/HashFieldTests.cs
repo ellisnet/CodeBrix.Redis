@@ -15,6 +15,15 @@ public class HashFieldTests(ITestOutputHelper output, SharedConnectionFixture fi
     private readonly DateTime nextCentury = new DateTime(2101, 1, 1, 0, 0, 0, DateTimeKind.Utc);
     private readonly TimeSpan oneYearInMs = TimeSpan.FromMilliseconds(31536000000);
 
+    //Upper slack for the TTL range assertions below. The absolute-time variants compute the expiry from
+    //this process's clock (DateTime.Now.AddMinutes(120)) and the server reports the TTL against ITS clock,
+    //so a server whose clock lags ours by even a millisecond reports a TTL a millisecond over the nominal
+    //two hours. Upstream asserts an exact upper bound, which holds when the server shares the host clock;
+    //here the server runs in Docker Desktop's Linux VM, whose clock was measured 1.5 ms behind the Mac on
+    //an Apple Silicon Mac mini (2026-09-15) and failed eight of these tests by 1-2 ms. One second keeps the
+    //assertion meaningful (the lower bound is already a full minute below) while absorbing VM clock skew.
+    private static readonly double ClockSkewSlackMs = TimeSpan.FromSeconds(1).TotalMilliseconds;
+
     private readonly HashEntry[] entries = [new("f1", 1), new("f2", 2)];
 
     private readonly RedisValue[] fields = ["f1", "f2"];
@@ -353,14 +362,14 @@ public class HashFieldTests(ITestOutputHelper output, SharedConnectionFixture fi
         var fieldResult = db.HashFieldGetAndSetExpiry(hashKey, "f1", TimeSpan.FromHours(1));
         fieldResult.Should().Be(1);
         var fieldTtl = db.HashFieldGetTimeToLive(hashKey, new RedisValue[] { "f1" })[0];
-        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds);
+        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing with datetime
         db.HashSet(hashKey, entries);
         fieldResult = db.HashFieldGetAndSetExpiry(hashKey, "f1", DateTime.Now.AddMinutes(120));
         fieldResult.Should().Be(1);
         fieldTtl = db.HashFieldGetTimeToLive(hashKey, new RedisValue[] { "f1" })[0];
-        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
+        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing persist
         fieldResult = db.HashFieldGetAndSetExpiry(hashKey, "f1", persist: true);
@@ -373,16 +382,16 @@ public class HashFieldTests(ITestOutputHelper output, SharedConnectionFixture fi
         var fieldResults = db.HashFieldGetAndSetExpiry(hashKey, fields, TimeSpan.FromHours(1));
         fieldResults.Should().Equal(values);
         var fieldTtls = db.HashFieldGetTimeToLive(hashKey, fields);
-        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds);
-        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds);
+        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds + ClockSkewSlackMs);
+        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing multiple fields with datetime
         db.HashSet(hashKey, entries);
         fieldResults = db.HashFieldGetAndSetExpiry(hashKey, fields, DateTime.Now.AddMinutes(120));
         fieldResults.Should().Equal(values);
         fieldTtls = db.HashFieldGetTimeToLive(hashKey, fields);
-        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
-        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
+        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
+        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing multiple fields with persist
         fieldResults = db.HashFieldGetAndSetExpiry(hashKey, fields, persist: true);
@@ -403,14 +412,14 @@ public class HashFieldTests(ITestOutputHelper output, SharedConnectionFixture fi
         var fieldResult = await db.HashFieldGetAndSetExpiryAsync(hashKey, "f1", TimeSpan.FromHours(1));
         fieldResult.Should().Be(1);
         var fieldTtl = db.HashFieldGetTimeToLive(hashKey, new RedisValue[] { "f1" })[0];
-        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds);
+        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing with datetime
         db.HashSet(hashKey, entries);
         fieldResult = await db.HashFieldGetAndSetExpiryAsync(hashKey, "f1", DateTime.Now.AddMinutes(120));
         fieldResult.Should().Be(1);
         fieldTtl = db.HashFieldGetTimeToLive(hashKey, new RedisValue[] { "f1" })[0];
-        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
+        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing persist
         fieldResult = await db.HashFieldGetAndSetExpiryAsync(hashKey, "f1", persist: true);
@@ -423,16 +432,16 @@ public class HashFieldTests(ITestOutputHelper output, SharedConnectionFixture fi
         var fieldResults = await db.HashFieldGetAndSetExpiryAsync(hashKey, fields, TimeSpan.FromHours(1));
         fieldResults.Should().Equal(values);
         var fieldTtls = db.HashFieldGetTimeToLive(hashKey, fields);
-        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds);
-        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds);
+        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds + ClockSkewSlackMs);
+        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing multiple fields with datetime
         db.HashSet(hashKey, entries);
         fieldResults = await db.HashFieldGetAndSetExpiryAsync(hashKey, fields, DateTime.Now.AddMinutes(120));
         fieldResults.Should().Equal(values);
         fieldTtls = db.HashFieldGetTimeToLive(hashKey, fields);
-        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
-        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
+        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
+        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing multiple fields with persist
         fieldResults = await db.HashFieldGetAndSetExpiryAsync(hashKey, fields, persist: true);
@@ -452,40 +461,40 @@ public class HashFieldTests(ITestOutputHelper output, SharedConnectionFixture fi
         var result = db.HashFieldSetAndSetExpiry(hashKey, "f1", 1, TimeSpan.FromHours(1));
         result.Should().Be(1);
         var fieldTtl = db.HashFieldGetTimeToLive(hashKey, new RedisValue[] { "f1" })[0];
-        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds);
+        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing with datetime
         result = db.HashFieldSetAndSetExpiry(hashKey, "f1", 1, DateTime.Now.AddMinutes(120));
         result.Should().Be(1);
         fieldTtl = db.HashFieldGetTimeToLive(hashKey, new RedisValue[] { "f1" })[0];
-        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
+        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing with keepttl
         result = db.HashFieldSetAndSetExpiry(hashKey, "f1", 1, keepTtl: true);
         result.Should().Be(1);
         fieldTtl = db.HashFieldGetTimeToLive(hashKey, new RedisValue[] { "f1" })[0];
-        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
+        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing multiple fields with timespan
         result = db.HashFieldSetAndSetExpiry(hashKey, entries, TimeSpan.FromHours(1));
         result.Should().Be(1);
         var fieldTtls = db.HashFieldGetTimeToLive(hashKey, fields);
-        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds);
-        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds);
+        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds + ClockSkewSlackMs);
+        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing multiple fields with datetime
         result = db.HashFieldSetAndSetExpiry(hashKey, entries, DateTime.Now.AddMinutes(120));
         result.Should().Be(1);
         fieldTtls = db.HashFieldGetTimeToLive(hashKey, fields);
-        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
-        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
+        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
+        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing multiple fields with keepttl
         result = db.HashFieldSetAndSetExpiry(hashKey, entries, keepTtl: true);
         result.Should().Be(1);
         fieldTtls = db.HashFieldGetTimeToLive(hashKey, fields);
-        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
-        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
+        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
+        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing with ExpireWhen.Exists
         db.KeyDelete(hashKey);
@@ -496,13 +505,13 @@ public class HashFieldTests(ITestOutputHelper output, SharedConnectionFixture fi
         result = db.HashFieldSetAndSetExpiry(hashKey, "f1", 1, TimeSpan.FromHours(1), when: When.NotExists);
         result.Should().Be(1); // should set because it doesnt exist
         fieldTtl = db.HashFieldGetTimeToLive(hashKey, new RedisValue[] { "f1" })[0];
-        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds);
+        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing with ExpireWhen.GreaterThanCurrentExpiry
         result = db.HashFieldSetAndSetExpiry(hashKey, "f1", -1, keepTtl: true, when: When.Exists);
         result.Should().Be(1); // should set because it exists
         fieldTtl = db.HashFieldGetTimeToLive(hashKey, new RedisValue[] { "f1" })[0];
-        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds);
+        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds + ClockSkewSlackMs);
     }
 
     [Fact]
@@ -516,40 +525,40 @@ public class HashFieldTests(ITestOutputHelper output, SharedConnectionFixture fi
         var result = await db.HashFieldSetAndSetExpiryAsync(hashKey, "f1", 1, TimeSpan.FromHours(1));
         result.Should().Be(1);
         var fieldTtl = db.HashFieldGetTimeToLive(hashKey, new RedisValue[] { "f1" })[0];
-        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds);
+        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing with datetime
         result = await db.HashFieldSetAndSetExpiryAsync(hashKey, "f1", 1, DateTime.Now.AddMinutes(120));
         result.Should().Be(1);
         fieldTtl = db.HashFieldGetTimeToLive(hashKey, new RedisValue[] { "f1" })[0];
-        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
+        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing with keepttl
         result = await db.HashFieldSetAndSetExpiryAsync(hashKey, "f1", 1, keepTtl: true);
         result.Should().Be(1);
         fieldTtl = db.HashFieldGetTimeToLive(hashKey, new RedisValue[] { "f1" })[0];
-        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
+        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing multiple fields with timespan
         result = await db.HashFieldSetAndSetExpiryAsync(hashKey, entries, TimeSpan.FromHours(1));
         result.Should().Be(1);
         var fieldTtls = db.HashFieldGetTimeToLive(hashKey, fields);
-        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds);
-        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds);
+        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds + ClockSkewSlackMs);
+        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing multiple fields with datetime
         result = await db.HashFieldSetAndSetExpiryAsync(hashKey, entries, DateTime.Now.AddMinutes(120));
         result.Should().Be(1);
         fieldTtls = db.HashFieldGetTimeToLive(hashKey, fields);
-        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
-        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
+        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
+        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing multiple fields with keepttl
         result = await db.HashFieldSetAndSetExpiryAsync(hashKey, entries, keepTtl: true);
         result.Should().Be(1);
         fieldTtls = db.HashFieldGetTimeToLive(hashKey, fields);
-        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
-        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds);
+        ((double)fieldTtls[0]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
+        ((double)fieldTtls[1]).Should().BeInRange(TimeSpan.FromMinutes(119).TotalMilliseconds, TimeSpan.FromHours(2).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing with ExpireWhen.Exists
         db.KeyDelete(hashKey);
@@ -560,13 +569,13 @@ public class HashFieldTests(ITestOutputHelper output, SharedConnectionFixture fi
         result = await db.HashFieldSetAndSetExpiryAsync(hashKey, "f1", 1, TimeSpan.FromHours(1), when: When.NotExists);
         result.Should().Be(1); // should set because it doesnt exist
         fieldTtl = db.HashFieldGetTimeToLive(hashKey, new RedisValue[] { "f1" })[0];
-        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds);
+        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds + ClockSkewSlackMs);
 
         // testing with ExpireWhen.GreaterThanCurrentExpiry
         result = await db.HashFieldSetAndSetExpiryAsync(hashKey, "f1", -1, keepTtl: true, when: When.Exists);
         result.Should().Be(1); // should set because it exists
         fieldTtl = db.HashFieldGetTimeToLive(hashKey, new RedisValue[] { "f1" })[0];
-        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds);
+        ((double)fieldTtl).Should().BeInRange(TimeSpan.FromMinutes(59).TotalMilliseconds, TimeSpan.FromHours(1).TotalMilliseconds + ClockSkewSlackMs);
     }
     [Fact]
     public void hash_field_get_and_delete()
