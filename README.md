@@ -63,6 +63,7 @@ are compile-time only, and nothing about them reaches your output.
 ### Connect, and read and write a value
 
 ```csharp
+using System;
 using CodeBrix.Redis;
 
 using var multiplexer = await ConnectionMultiplexer.ConnectAsync("localhost:6379");
@@ -78,6 +79,7 @@ Console.WriteLine(value);   // hello world
 ### Take a distributed lock
 
 ```csharp
+using System;
 using CodeBrix.Redis;
 using CodeBrix.Redis.RedLock;
 using CodeBrix.Redis.RedLock.Configuration;

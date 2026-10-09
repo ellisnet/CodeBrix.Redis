@@ -188,7 +188,7 @@ its own types are behind. THIRD-PARTY-NOTICES.txt records that too.
 There is exactly ONE NoWarn line, listing six SERxxxx [Experimental] gate
 identifiers - plus, on the test side only, StringToRedisValue - see deviation 4
 below; it is closed, and nothing may ever be added to it.
-GenerateDocumentationFile is on, so CS1591 fires for any undocumented public
+GenerateDocumentationFile is on, so CS1591 is reported for any undocumented public
 member - fix it by writing the comment, never by suppressing the warning. That
 applies to the RESPite-derived public types too: upstream builds RESPite with
 documentation generation off, but this assembly ships one documentation file, so
@@ -517,7 +517,7 @@ Family conventions apply, with the deviations noted in the next section:
     //Assert comments; single-statement bodies are expression-bodied. Prefer
     SilverAssertions' fluent form (x.Should().Be(y)) over Assert.Equal. Thread
     TestContext.Current.CancellationToken through every cancellable call in a
-    test - xUnit1051 fires otherwise.
+    test - xUnit1051 is reported otherwise.
 
 Ported test source arrives written in the upstream's style. Convert it to the
 conventions above as it lands, in the same pass; do not leave the drift behind

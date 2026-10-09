@@ -648,8 +648,10 @@ the multiplexer as anything other than a singleton is the pitfall below.
 
 A CACHE-ASIDE READ
 ------------------
-    using CodeBrix.Redis;
+    using System;
     using System.Text.Json;
+    using System.Threading.Tasks;
+    using CodeBrix.Redis;
 
     public sealed class OrderCache(IDatabase db)
     {
@@ -676,6 +678,8 @@ A CACHE-ASIDE READ
 
 A WORK QUEUE ON A STREAM, WITH A CONSUMER GROUP
 -----------------------------------------------
+    using System;
+    using System.Linq;
     using CodeBrix.Redis;
 
     const string Stream = "jobs";

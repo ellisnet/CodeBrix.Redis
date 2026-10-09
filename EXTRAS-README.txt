@@ -60,7 +60,7 @@ Two things about it are not obvious and are easy to undo by accident:
     compiling. Upstream gives every project that reference from a repo-wide
     Directory.Build.props; this repository has none, so each csproj says it.
 
-Ported 2026-09-01: 8 of upstream's 10 files, 4,033 lines, building 0 warnings
+Ported: 8 of upstream's 10 files, 4,033 lines, building 0 warnings
 and 0 errors in Debug and Release. The two that were not ported are recorded in
 THIRD-PARTY-NOTICES.txt section 1, with the reasons.
 
